@@ -22,28 +22,25 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-
-	// nolint:gosec
-	_ "net/http/pprof"
+	_ "net/http/pprof" // nolint:gosec
 
 	"go.opencensus.io/stats/view"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/checks"
-	"github.com/ossf/scorecard/v3/clients"
-	"github.com/ossf/scorecard/v3/clients/githubrepo"
-	githubstats "github.com/ossf/scorecard/v3/clients/githubrepo/stats"
-	"github.com/ossf/scorecard/v3/cron/config"
-	"github.com/ossf/scorecard/v3/cron/data"
-	format "github.com/ossf/scorecard/v3/cron/format"
-	"github.com/ossf/scorecard/v3/cron/monitoring"
-	"github.com/ossf/scorecard/v3/cron/pubsub"
-	docs "github.com/ossf/scorecard/v3/docs/checks"
-	sce "github.com/ossf/scorecard/v3/errors"
-	"github.com/ossf/scorecard/v3/pkg"
-	"github.com/ossf/scorecard/v3/stats"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/checks"
+	"github.com/ossf/scorecard/v4/clients"
+	"github.com/ossf/scorecard/v4/clients/githubrepo"
+	githubstats "github.com/ossf/scorecard/v4/clients/githubrepo/stats"
+	"github.com/ossf/scorecard/v4/cron/config"
+	"github.com/ossf/scorecard/v4/cron/data"
+	format "github.com/ossf/scorecard/v4/cron/format"
+	"github.com/ossf/scorecard/v4/cron/monitoring"
+	"github.com/ossf/scorecard/v4/cron/pubsub"
+	docs "github.com/ossf/scorecard/v4/docs/checks"
+	sce "github.com/ossf/scorecard/v4/errors"
+	"github.com/ossf/scorecard/v4/log"
+	"github.com/ossf/scorecard/v4/pkg"
+	"github.com/ossf/scorecard/v4/stats"
 )
 
 var ignoreRuntimeErrors = flag.Bool("ignoreRuntimeErrors", false, "if set to true any runtime errors will be ignored")
@@ -52,7 +49,9 @@ func processRequest(ctx context.Context,
 	batchRequest *data.ScorecardBatchRequest, checksToRun checker.CheckNameToFnMap,
 	bucketURL, bucketURL2 string, checkDocs docs.Doc,
 	repoClient clients.RepoClient, ossFuzzRepoClient clients.RepoClient,
-	ciiClient clients.CIIBestPracticesClient, logger *zap.Logger) error {
+	ciiClient clients.CIIBestPracticesClient,
+	vulnsClient clients.VulnerabilitiesClient,
+	logger *log.Logger) error {
 	filename := data.GetBlobFilename(
 		fmt.Sprintf("shard-%07d", batchRequest.GetShardNum()),
 		batchRequest.GetJobTime().AsTime())
@@ -79,11 +78,13 @@ func processRequest(ctx context.Context,
 		logger.Info(fmt.Sprintf("Running Scorecard for repo: %s", *repo.Url))
 		repo, err := githubrepo.MakeGithubRepo(*repo.Url)
 		if err != nil {
-			logger.Warn(fmt.Sprintf("invalid GitHub URL: %v", err))
+			// TODO(log): Previously Warn. Consider logging an error here.
+			logger.Info(fmt.Sprintf("invalid GitHub URL: %v", err))
 			continue
 		}
 		repo.AppendMetadata(repo.Metadata()...)
-		result, err := pkg.RunScorecards(ctx, repo, checksToRun, repoClient, ossFuzzRepoClient, ciiClient)
+		result, err := pkg.RunScorecards(ctx, repo, clients.HeadSHA /*commitSHA*/, false /*raw*/, checksToRun,
+			repoClient, ossFuzzRepoClient, ciiClient, vulnsClient)
 		if errors.Is(err, sce.ErrRepoUnreachable) {
 			// Not accessible repo - continue.
 			continue
@@ -101,14 +102,15 @@ func processRequest(ctx context.Context,
 				// nolint: goerr113
 				return errors.New(errorMsg)
 			}
-			logger.Warn(errorMsg)
+			// TODO(log): Previously Warn. Consider logging an error here.
+			logger.Info(errorMsg)
 		}
 		result.Date = batchRequest.GetJobTime().AsTime()
-		if err := format.AsJSON(&result, true /*showDetails*/, zapcore.InfoLevel, &buffer); err != nil {
+		if err := format.AsJSON(&result, true /*showDetails*/, log.InfoLevel, &buffer); err != nil {
 			return fmt.Errorf("error during result.AsJSON: %w", err)
 		}
 
-		if err := format.AsJSON2(&result, true /*showDetails*/, zapcore.InfoLevel, checkDocs, &buffer2); err != nil {
+		if err := format.AsJSON2(&result, true /*showDetails*/, log.InfoLevel, checkDocs, &buffer2); err != nil {
 			return fmt.Errorf("error during result.AsJSON2: %w", err)
 		}
 	}
@@ -183,13 +185,11 @@ func main() {
 		panic(err)
 	}
 
-	logger, err := githubrepo.NewLogger(zap.InfoLevel)
-	if err != nil {
-		panic(err)
-	}
+	logger := log.NewLogger(log.InfoLevel)
 	repoClient := githubrepo.CreateGithubRepoClient(ctx, logger)
 	ciiClient := clients.BlobCIIBestPracticesClient(ciiDataBucketURL)
 	ossFuzzRepoClient, err := githubrepo.CreateOssFuzzRepoClient(ctx, logger)
+	vulnsClient := clients.DefaultVulnerabilitiesClient()
 	if err != nil {
 		panic(err)
 	}
@@ -203,7 +203,8 @@ func main() {
 
 	// Exposed for monitoring runtime profiles
 	go func() {
-		logger.Fatal(fmt.Sprintf("%v", http.ListenAndServe(":8080", nil)))
+		// TODO(log): Previously Fatal. Need to handle the error here.
+		logger.Info(fmt.Sprintf("%v", http.ListenAndServe(":8080", nil)))
 	}()
 
 	checksToRun := checks.AllChecks
@@ -215,21 +216,23 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
 		logger.Info("Received message from subscription")
 		if req == nil {
-			logger.Warn("subscription returned nil message during Receive, exiting")
+			// TODO(log): Previously Warn. Consider logging an error here.
+			logger.Info("subscription returned nil message during Receive, exiting")
 			break
 		}
 		if err := processRequest(ctx, req, checksToRun,
 			bucketURL, bucketURL2, checkDocs,
-			repoClient, ossFuzzRepoClient, ciiClient, logger); err != nil {
-			logger.Warn(fmt.Sprintf("error processing request: %v", err))
+			repoClient, ossFuzzRepoClient, ciiClient, vulnsClient, logger); err != nil {
+			// TODO(log): Previously Warn. Consider logging an error here.
+			logger.Info(fmt.Sprintf("error processing request: %v", err))
 			// Nack the message so that another worker can retry.
 			subscriber.Nack()
 			continue
 		}
-		// nolint: errcheck // flushes buffer
-		logger.Sync()
+
 		exporter.Flush()
 		subscriber.Ack()
 	}

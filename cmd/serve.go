@@ -17,17 +17,17 @@ package cmd
 import (
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/ossf/scorecard/v3/checks"
-	"github.com/ossf/scorecard/v3/clients"
-	"github.com/ossf/scorecard/v3/clients/githubrepo"
-	"github.com/ossf/scorecard/v3/pkg"
+	"github.com/ossf/scorecard/v4/checks"
+	"github.com/ossf/scorecard/v4/clients"
+	"github.com/ossf/scorecard/v4/clients/githubrepo"
+	"github.com/ossf/scorecard/v4/log"
+	"github.com/ossf/scorecard/v4/pkg"
 )
 
 //nolint:gochecknoinits
@@ -40,16 +40,13 @@ var serveCmd = &cobra.Command{
 	Short: "Serve the scorecard program over http",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		logger, err := githubrepo.NewLogger(*logLevel)
-		if err != nil {
-			log.Fatalf("unable to construct logger: %v", err)
-		}
-		//nolint
-		defer logger.Sync() // flushes buffer, if any
-		sugar := logger.Sugar()
+		logger := log.NewLogger(log.ParseLevel(flagLogLevel))
+
 		t, err := template.New("webpage").Parse(tpl)
 		if err != nil {
-			sugar.Panic(err)
+			// TODO(log): Should this actually panic?
+			logger.Error(err, "parsing webpage template")
+			panic(err)
 		}
 
 		http.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
@@ -66,27 +63,32 @@ var serveCmd = &cobra.Command{
 			ctx := r.Context()
 			repoClient := githubrepo.CreateGithubRepoClient(ctx, logger)
 			ossFuzzRepoClient, err := githubrepo.CreateOssFuzzRepoClient(ctx, logger)
+			vulnsClient := clients.DefaultVulnerabilitiesClient()
 			if err != nil {
-				sugar.Error(err)
+				logger.Error(err, "initializing clients")
 				rw.WriteHeader(http.StatusInternalServerError)
 			}
 			defer ossFuzzRepoClient.Close()
 			ciiClient := clients.DefaultCIIBestPracticesClient()
-			repoResult, err := pkg.RunScorecards(ctx, repo, checks.AllChecks, repoClient, ossFuzzRepoClient, ciiClient)
+			repoResult, err := pkg.RunScorecards(
+				ctx, repo, clients.HeadSHA /*commitSHA*/, false /*raw*/, checks.AllChecks, repoClient,
+				ossFuzzRepoClient, ciiClient, vulnsClient)
 			if err != nil {
-				sugar.Error(err)
+				logger.Error(err, "running enabled scorecard checks on repo")
 				rw.WriteHeader(http.StatusInternalServerError)
 			}
 
 			if r.Header.Get("Content-Type") == "application/json" {
-				if err := repoResult.AsJSON(showDetails, *logLevel, rw); err != nil {
-					sugar.Error(err)
+				if err := repoResult.AsJSON(flagShowDetails, log.ParseLevel(flagLogLevel), rw); err != nil {
+					// TODO(log): Improve error message
+					logger.Error(err, "")
 					rw.WriteHeader(http.StatusInternalServerError)
 				}
 				return
 			}
 			if err := t.Execute(rw, repoResult); err != nil {
-				sugar.Warn(err)
+				// TODO(log): Improve error message
+				logger.Error(err, "")
 			}
 		})
 		port := os.Getenv("PORT")
@@ -96,7 +98,9 @@ var serveCmd = &cobra.Command{
 		fmt.Printf("Listening on localhost:%s\n", port)
 		err = http.ListenAndServe(fmt.Sprintf("0.0.0.0:%s", port), nil)
 		if err != nil {
-			log.Fatal("ListenAndServe ", err)
+			// TODO(log): Should this actually panic?
+			logger.Error(err, "listening and serving")
+			panic(err)
 		}
 	},
 }

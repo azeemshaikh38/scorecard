@@ -11,18 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-name: release workflow
-on: [push]
-permissions: 
+on: issue_comment
 
 jobs:
-  Explore-GitHub-Actions:
+  issue_commented:
+    # This job only runs for issue comments
+    name: Issue comment
+    if: ${{ !github.event.issue.pull_request }}
     runs-on: ubuntu-latest
-    permissions: 
-      contents: write
     steps:
-      - name: setup
-        uses: actions/setup-java@
-      - name: publish
-        run: |
-              mvn deploy bla
+      - run: |
+          echo "Comment on issue #${{ github.event.issue.number }}"

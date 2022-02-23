@@ -17,12 +17,14 @@ package fileparser
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/rhysd/actionlint"
 
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/checker"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
 const (
@@ -59,6 +61,59 @@ func IsStepExecKind(step *actionlint.Step, kind actionlint.ExecKind) bool {
 	return step.Exec.Kind() == kind
 }
 
+// GetLineNumber returns the line number for this position.
+func GetLineNumber(pos *actionlint.Pos) uint {
+	if pos == nil {
+		return checker.OffsetDefault
+	}
+	return uint(pos.Line)
+}
+
+// GetUses returns the 'uses' statement in this step or nil if this step does not have one.
+func GetUses(step *actionlint.Step) *actionlint.String {
+	if step == nil {
+		return nil
+	}
+	if !IsStepExecKind(step, actionlint.ExecKindAction) {
+		return nil
+	}
+	execAction, ok := step.Exec.(*actionlint.ExecAction)
+	if !ok || execAction == nil {
+		return nil
+	}
+	return execAction.Uses
+}
+
+// getWith returns the 'with' statement in this step or nil if this step does not have one.
+func getWith(step *actionlint.Step) map[string]*actionlint.Input {
+	if step == nil {
+		return nil
+	}
+	if !IsStepExecKind(step, actionlint.ExecKindAction) {
+		return nil
+	}
+	execAction, ok := step.Exec.(*actionlint.ExecAction)
+	if !ok || execAction == nil {
+		return nil
+	}
+	return execAction.Inputs
+}
+
+// getRun returns the 'run' statement in this step or nil if this step does not have one.
+func getRun(step *actionlint.Step) *actionlint.String {
+	if step == nil {
+		return nil
+	}
+	if !IsStepExecKind(step, actionlint.ExecKindRun) {
+		return nil
+	}
+	execAction, ok := step.Exec.(*actionlint.ExecRun)
+	if !ok || execAction == nil {
+		return nil
+	}
+	return execAction.Run
+}
+
 func getExecRunShell(execRun *actionlint.ExecRun) string {
 	if execRun != nil && execRun.Shell != nil {
 		return execRun.Shell.Value
@@ -83,6 +138,14 @@ func getJobRunsOnLabels(job *actionlint.Job) []*actionlint.String {
 func getJobStrategyMatrixRows(job *actionlint.Job) map[string]*actionlint.MatrixRow {
 	if job != nil && job.Strategy != nil && job.Strategy.Matrix != nil {
 		return job.Strategy.Matrix.Rows
+	}
+	return nil
+}
+
+func getJobStrategyMatrixIncludeCombinations(job *actionlint.Job) []*actionlint.MatrixCombination {
+	if job != nil && job.Strategy != nil && job.Strategy.Matrix != nil && job.Strategy.Matrix.Include != nil &&
+		job.Strategy.Matrix.Include.Combinations != nil {
+		return job.Strategy.Matrix.Include.Combinations
 	}
 	return nil
 }
@@ -122,6 +185,19 @@ func GetOSesForJob(job *actionlint.Job) ([]string, error) {
 		}
 		for _, os := range rowValue.Values {
 			jobOSes = append(jobOSes, strings.Trim(os.String(), "'\""))
+		}
+	}
+
+	matrixCombinations := getJobStrategyMatrixIncludeCombinations(job)
+	for _, combination := range matrixCombinations {
+		if combination.Assigns == nil {
+			continue
+		}
+		for _, assign := range combination.Assigns {
+			if assign.Key == nil || assign.Key.Value != os || assign.Value == nil {
+				continue
+			}
+			jobOSes = append(jobOSes, strings.Trim(assign.Value.String(), "'\""))
 		}
 	}
 
@@ -217,10 +293,16 @@ func IsWorkflowFile(pathfn string) bool {
 	// "Workflow files use YAML syntax, and must have either a .yml or .yaml file extension."
 	switch path.Ext(pathfn) {
 	case ".yml", ".yaml":
-		return true
+		return filepath.Dir(strings.ToLower(pathfn)) == ".github/workflows"
 	default:
 		return false
 	}
+}
+
+// IsGithubWorkflowFileCb determines if a file is a workflow
+// as a callback to use for repo client's ListFiles() API.
+func IsGithubWorkflowFileCb(pathfn string) (bool, error) {
+	return IsWorkflowFile(pathfn), nil
 }
 
 // IsGitHubOwnedAction checks if this is a github specific action.
@@ -228,4 +310,109 @@ func IsGitHubOwnedAction(actionName string) bool {
 	a := strings.HasPrefix(actionName, "actions/")
 	c := strings.HasPrefix(actionName, "github/")
 	return a || c
+}
+
+// JobMatcher is rule for matching a job.
+type JobMatcher struct {
+	// The text to be logged when a job match is found.
+	LogText string
+	// Each step in this field has a matching step in the job.
+	Steps []*JobMatcherStep
+}
+
+// JobMatcherStep is a single step that needs to be matched.
+type JobMatcherStep struct {
+	// If set, the step's 'Uses' must match this field. Checks that the action name is the same.
+	Uses string
+	// If set, the step's 'With' have the keys and values that are in this field.
+	With map[string]string
+	// If set, the step's 'Run' must match this field. Does a regex match using this field.
+	Run string
+}
+
+// AnyJobsMatch returns true if any of the jobs have a match in the given workflow.
+func AnyJobsMatch(workflow *actionlint.Workflow, jobMatchers []JobMatcher, fp string, dl checker.DetailLogger,
+	logMsgNoMatch string) bool {
+	for _, job := range workflow.Jobs {
+		for _, matcher := range jobMatchers {
+			if !matcher.matches(job) {
+				continue
+			}
+
+			dl.Info(&checker.LogMessage{
+				Path:   fp,
+				Type:   checker.FileTypeSource,
+				Offset: GetLineNumber(job.Pos),
+				Text:   matcher.LogText,
+			})
+			return true
+		}
+	}
+
+	dl.Debug(&checker.LogMessage{
+		Path:   fp,
+		Type:   checker.FileTypeSource,
+		Offset: checker.OffsetDefault,
+		Text:   logMsgNoMatch,
+	})
+	return false
+}
+
+// matches returns true if the job matches the job matcher.
+func (m *JobMatcher) matches(job *actionlint.Job) bool {
+	for _, stepToMatch := range m.Steps {
+		hasMatch := false
+		for _, step := range job.Steps {
+			if stepsMatch(stepToMatch, step) {
+				hasMatch = true
+				break
+			}
+		}
+		if !hasMatch {
+			return false
+		}
+	}
+	return true
+}
+
+// stepsMatch returns true if the fields on 'stepToMatch' match what's in 'step'.
+func stepsMatch(stepToMatch *JobMatcherStep, step *actionlint.Step) bool {
+	// Make sure 'uses' matches if present.
+	if stepToMatch.Uses != "" {
+		uses := GetUses(step)
+		if uses == nil {
+			return false
+		}
+		if !strings.HasPrefix(uses.Value, stepToMatch.Uses+"@") {
+			return false
+		}
+	}
+
+	// Make sure 'with' matches if present.
+	if len(stepToMatch.With) > 0 {
+		with := getWith(step)
+		if with == nil {
+			return false
+		}
+		for keyToMatch, valToMatch := range stepToMatch.With {
+			input, ok := with[keyToMatch]
+			if !ok || input == nil || input.Value == nil || input.Value.Value != valToMatch {
+				return false
+			}
+		}
+	}
+
+	// Make sure 'run' matches if present.
+	if stepToMatch.Run != "" {
+		run := getRun(step)
+		if run == nil {
+			return false
+		}
+		r := regexp.MustCompile(stepToMatch.Run)
+		if !r.MatchString(run.Value) {
+			return false
+		}
+	}
+
+	return true
 }

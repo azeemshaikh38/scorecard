@@ -17,13 +17,14 @@ package e2e
 import (
 	"context"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/checks"
-	"github.com/ossf/scorecard/v3/clients/githubrepo"
-	scut "github.com/ossf/scorecard/v3/utests"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/checks"
+	"github.com/ossf/scorecard/v4/clients"
+	"github.com/ossf/scorecard/v4/clients/githubrepo"
+	scut "github.com/ossf/scorecard/v4/utests"
 )
 
 var _ = Describe("E2E TEST:"+checks.CheckPackaging, func() {
@@ -33,7 +34,7 @@ var _ = Describe("E2E TEST:"+checks.CheckPackaging, func() {
 			repo, err := githubrepo.MakeGithubRepo("ossf-tests/scorecard-check-packaging-e2e")
 			Expect(err).Should(BeNil())
 			repoClient := githubrepo.CreateGithubRepoClient(context.Background(), logger)
-			err = repoClient.InitRepo(repo)
+			err = repoClient.InitRepo(repo, clients.HeadSHA)
 			Expect(err).Should(BeNil())
 			req := checker.CheckRequest{
 				Ctx:        context.Background(),
@@ -45,8 +46,8 @@ var _ = Describe("E2E TEST:"+checks.CheckPackaging, func() {
 				Error:         nil,
 				Score:         checker.InconclusiveResultScore,
 				NumberOfWarn:  1,
-				NumberOfInfo:  2,
-				NumberOfDebug: 2,
+				NumberOfInfo:  1,
+				NumberOfDebug: 3,
 			}
 			result := checks.Packaging(&req)
 			Expect(scut.ValidateTestReturn(nil, "use packaging", &expected, &result, &dl)).Should(BeTrue())

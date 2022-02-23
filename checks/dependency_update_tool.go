@@ -15,11 +15,10 @@
 package checks
 
 import (
-	"strings"
-
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/checks/fileparser"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/checks/evaluation"
+	"github.com/ossf/scorecard/v4/checks/raw"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
 // CheckDependencyUpdateTool is the exported name for Automatic-Depdendency-Update.
@@ -27,62 +26,29 @@ const CheckDependencyUpdateTool = "Dependency-Update-Tool"
 
 //nolint
 func init() {
-	registerCheck(CheckDependencyUpdateTool, UsesDependencyUpdateTool)
+	var supportedRequestTypes = []checker.RequestType{
+		checker.FileBased,
+	}
+	if err := registerCheck(CheckDependencyUpdateTool, DependencyUpdateTool, supportedRequestTypes); err != nil {
+		// this should never happen
+		panic(err)
+	}
 }
 
-// UsesDependencyUpdateTool will check the repository uses a dependency update tool.
-func UsesDependencyUpdateTool(c *checker.CheckRequest) checker.CheckResult {
-	var r bool
-	err := fileparser.CheckIfFileExists(CheckDependencyUpdateTool, c, fileExists, &r)
+// DependencyUpdateTool checks if the repository uses a dependency update tool.
+func DependencyUpdateTool(c *checker.CheckRequest) checker.CheckResult {
+	rawData, err := raw.DependencyUpdateTool(c.RepoClient)
 	if err != nil {
 		e := sce.WithMessage(sce.ErrScorecardInternal, err.Error())
 		return checker.CreateRuntimeErrorResult(CheckDependencyUpdateTool, e)
 	}
-	if !r {
-		c.Dlogger.Warn3(&checker.LogMessage{
-			Text: `dependabot config file not detected in source location.
-			We recommend setting this configuration in code so it can be easily verified by others.`,
-		})
-		c.Dlogger.Warn3(&checker.LogMessage{
-			Text: `renovatebot config file not detected in source location.
-			We recommend setting this configuration in code so it can be easily verified by others.`,
-		})
-		return checker.CreateMinScoreResult(CheckDependencyUpdateTool, "no update tool detected")
+
+	// Return raw results.
+	if c.RawResults != nil {
+		c.RawResults.DependencyUpdateToolResults = rawData
+		return checker.CheckResult{}
 	}
 
-	// High score result.
-	return checker.CreateMaxScoreResult(CheckDependencyUpdateTool, "update tool detected")
-}
-
-// fileExists will validate the if frozen dependencies file name exists.
-func fileExists(name string, dl checker.DetailLogger, data fileparser.FileCbData) (bool, error) {
-	pdata := fileparser.FileGetCbDataAsBoolPointer(data)
-
-	switch strings.ToLower(name) {
-	case ".github/dependabot.yml":
-		dl.Info3(&checker.LogMessage{
-			Path: name,
-			Type: checker.FileTypeSource,
-			// Source file must have line number > 0.
-			Offset: 1,
-			Text:   "dependabot detected",
-		})
-		// https://docs.renovatebot.com/configuration-options/
-	case ".github/renovate.json", ".github/renovate.json5", ".renovaterc.json", "renovate.json",
-		"renovate.json5", ".renovaterc":
-		dl.Info3(&checker.LogMessage{
-			Path: name,
-			Type: checker.FileTypeSource,
-			// Source file must have line number > 0.
-			Offset: 1,
-			Text:   "renovate detected",
-		})
-	default:
-		// Continue iterating.
-		return true, nil
-	}
-
-	*pdata = true
-	// We found the file, no need to continue iterating.
-	return false, nil
+	// Return the score evaluation.
+	return evaluation.DependencyUpdateTool(CheckDependencyUpdateTool, c.Dlogger, &rawData)
 }

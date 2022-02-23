@@ -17,29 +17,31 @@ package githubrepo
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/go-github/v38/github"
 
-	"github.com/ossf/scorecard/v3/clients"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/clients"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
 type statusesHandler struct {
-	client *github.Client
-	ctx    context.Context
-	owner  string
-	repo   string
+	client  *github.Client
+	ctx     context.Context
+	repourl *repoURL
 }
 
-func (handler *statusesHandler) init(ctx context.Context, owner, repo string) {
+func (handler *statusesHandler) init(ctx context.Context, repourl *repoURL) {
 	handler.ctx = ctx
-	handler.owner = owner
-	handler.repo = repo
+	handler.repourl = repourl
 }
 
 func (handler *statusesHandler) listStatuses(ref string) ([]clients.Status, error) {
-	statuses, _, err := handler.client.Repositories.ListStatuses(handler.ctx, handler.owner, handler.repo, ref,
-		&github.ListOptions{})
+	if !strings.EqualFold(handler.repourl.commitSHA, clients.HeadSHA) {
+		return nil, fmt.Errorf("%w: ListStatuses only supported for HEAD queries", clients.ErrUnsupportedFeature)
+	}
+	statuses, _, err := handler.client.Repositories.ListStatuses(
+		handler.ctx, handler.repourl.owner, handler.repourl.repo, ref, &github.ListOptions{})
 	if err != nil {
 		return nil, sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("ListStatuses: %v", err))
 	}
@@ -50,9 +52,10 @@ func statusesFrom(data []*github.RepoStatus) []clients.Status {
 	var statuses []clients.Status
 	for _, status := range data {
 		statuses = append(statuses, clients.Status{
-			State:   status.GetState(),
-			Context: status.GetContext(),
-			URL:     status.GetURL(),
+			State:     status.GetState(),
+			Context:   status.GetContext(),
+			URL:       status.GetURL(),
+			TargetURL: status.GetTargetURL(),
 		})
 	}
 	return statuses

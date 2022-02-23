@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"github.com/xeipuuv/gojsonschema"
-	"go.uber.org/zap/zapcore"
 
-	"github.com/ossf/scorecard/v3/checker"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/log"
 )
 
 func jsonMockDocRead() *mockDoc {
@@ -83,14 +83,14 @@ func TestJSONOutput(t *testing.T) {
 		name        string
 		expected    string
 		showDetails bool
-		logLevel    zapcore.Level
+		logLevel    log.Level
 		result      ScorecardResult
 	}{
 		{
 			name:        "check-1",
 			showDetails: true,
 			expected:    "./testdata/check1.json",
-			logLevel:    zapcore.DebugLevel,
+			logLevel:    log.DebugLevel,
 			result: ScorecardResult{
 				Repo: RepoInfo{
 					Name:      repoName,
@@ -112,8 +112,6 @@ func TestJSONOutput(t *testing.T) {
 									Type:    checker.FileTypeSource,
 									Offset:  5,
 									Snippet: "if (bad) {BUG();}",
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 						},
@@ -129,7 +127,7 @@ func TestJSONOutput(t *testing.T) {
 			name:        "check-2",
 			showDetails: true,
 			expected:    "./testdata/check2.json",
-			logLevel:    zapcore.DebugLevel,
+			logLevel:    log.DebugLevel,
 			result: ScorecardResult{
 				Repo: RepoInfo{
 					Name:      repoName,
@@ -150,8 +148,6 @@ func TestJSONOutput(t *testing.T) {
 									Path:   "bin/binary.elf",
 									Type:   checker.FileTypeBinary,
 									Offset: 0,
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 						},
@@ -167,7 +163,7 @@ func TestJSONOutput(t *testing.T) {
 			name:        "check-3",
 			showDetails: true,
 			expected:    "./testdata/check3.json",
-			logLevel:    zapcore.InfoLevel,
+			logLevel:    log.InfoLevel,
 			result: ScorecardResult{
 				Repo: RepoInfo{
 					Name:      repoName,
@@ -188,8 +184,6 @@ func TestJSONOutput(t *testing.T) {
 									Path:   "bin/binary.elf",
 									Type:   checker.FileTypeBinary,
 									Offset: 0,
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 						},
@@ -207,8 +201,6 @@ func TestJSONOutput(t *testing.T) {
 									Type:    checker.FileTypeText,
 									Offset:  3,
 									Snippet: "some text",
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 						},
@@ -226,8 +218,6 @@ func TestJSONOutput(t *testing.T) {
 									Type:    checker.FileTypeSource,
 									Offset:  3,
 									Snippet: "if (bad) {BUG();}",
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 							{
@@ -238,8 +228,6 @@ func TestJSONOutput(t *testing.T) {
 									Type:    checker.FileTypeSource,
 									Offset:  3,
 									Snippet: "if (bad) {BUG2();}",
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 							{
@@ -250,8 +238,6 @@ func TestJSONOutput(t *testing.T) {
 									Type:    checker.FileTypeSource,
 									Offset:  3,
 									Snippet: "if (bad) {BUG5();}",
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 						},
@@ -267,7 +253,7 @@ func TestJSONOutput(t *testing.T) {
 			name:        "check-4",
 			showDetails: true,
 			expected:    "./testdata/check4.json",
-			logLevel:    zapcore.DebugLevel,
+			logLevel:    log.DebugLevel,
 			result: ScorecardResult{
 				Repo: RepoInfo{
 					Name:      repoName,
@@ -288,8 +274,6 @@ func TestJSONOutput(t *testing.T) {
 									Path:   "bin/binary.elf",
 									Type:   checker.FileTypeBinary,
 									Offset: 0,
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 						},
@@ -307,8 +291,6 @@ func TestJSONOutput(t *testing.T) {
 									Type:    checker.FileTypeText,
 									Offset:  3,
 									Snippet: "some text",
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 						},
@@ -326,8 +308,6 @@ func TestJSONOutput(t *testing.T) {
 									Type:    checker.FileTypeSource,
 									Offset:  3,
 									Snippet: "if (bad) {BUG();}",
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 							{
@@ -338,8 +318,6 @@ func TestJSONOutput(t *testing.T) {
 									Type:    checker.FileTypeSource,
 									Offset:  3,
 									Snippet: "if (bad) {BUG2();}",
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 							{
@@ -350,8 +328,6 @@ func TestJSONOutput(t *testing.T) {
 									Type:    checker.FileTypeSource,
 									Offset:  3,
 									Snippet: "if (bad) {BUG5();}",
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 						},
@@ -367,7 +343,7 @@ func TestJSONOutput(t *testing.T) {
 			name:        "check-5",
 			showDetails: true,
 			expected:    "./testdata/check5.json",
-			logLevel:    zapcore.WarnLevel,
+			logLevel:    log.WarnLevel,
 			result: ScorecardResult{
 				Repo: RepoInfo{
 					Name:      repoName,
@@ -389,8 +365,6 @@ func TestJSONOutput(t *testing.T) {
 									Type:    checker.FileTypeSource,
 									Offset:  5,
 									Snippet: "if (bad) {BUG();}",
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 						},
@@ -406,7 +380,7 @@ func TestJSONOutput(t *testing.T) {
 			name:        "check-6",
 			showDetails: true,
 			expected:    "./testdata/check6.json",
-			logLevel:    zapcore.WarnLevel,
+			logLevel:    log.WarnLevel,
 			result: ScorecardResult{
 				Repo: RepoInfo{
 					Name:      repoName,
@@ -426,8 +400,6 @@ func TestJSONOutput(t *testing.T) {
 									Text: "warn message",
 									Path: "https://domain.com/something",
 									Type: checker.FileTypeURL,
-									// UPGRADEv3: to remove.
-									Version: 3,
 								},
 							},
 						},

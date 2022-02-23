@@ -17,13 +17,14 @@ package e2e
 import (
 	"context"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/checks"
-	"github.com/ossf/scorecard/v3/clients/githubrepo"
-	scut "github.com/ossf/scorecard/v3/utests"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/checks"
+	"github.com/ossf/scorecard/v4/clients"
+	"github.com/ossf/scorecard/v4/clients/githubrepo"
+	scut "github.com/ossf/scorecard/v4/utests"
 )
 
 // TODO: use dedicated repo that don't change.
@@ -35,7 +36,7 @@ var _ = Describe("E2E TEST:"+checks.CheckDependencyUpdateTool, func() {
 			repo, err := githubrepo.MakeGithubRepo("ossf/scorecard")
 			Expect(err).Should(BeNil())
 			repoClient := githubrepo.CreateGithubRepoClient(context.Background(), logger)
-			err = repoClient.InitRepo(repo)
+			err = repoClient.InitRepo(repo, clients.HeadSHA)
 			Expect(err).Should(BeNil())
 
 			req := checker.CheckRequest{
@@ -52,7 +53,7 @@ var _ = Describe("E2E TEST:"+checks.CheckDependencyUpdateTool, func() {
 				NumberOfDebug: 0,
 			}
 
-			result := checks.UsesDependencyUpdateTool(&req)
+			result := checks.DependencyUpdateTool(&req)
 			// UPGRADEv2: to remove.
 			// Old version.
 			Expect(result.Error).Should(BeNil())
@@ -66,7 +67,7 @@ var _ = Describe("E2E TEST:"+checks.CheckDependencyUpdateTool, func() {
 			repo, err := githubrepo.MakeGithubRepo("netlify/netlify-cms")
 			Expect(err).Should(BeNil())
 			repoClient := githubrepo.CreateGithubRepoClient(context.Background(), logger)
-			err = repoClient.InitRepo(repo)
+			err = repoClient.InitRepo(repo, clients.HeadSHA)
 			Expect(err).Should(BeNil())
 
 			req := checker.CheckRequest{
@@ -82,7 +83,7 @@ var _ = Describe("E2E TEST:"+checks.CheckDependencyUpdateTool, func() {
 				NumberOfInfo:  1,
 				NumberOfDebug: 0,
 			}
-			result := checks.UsesDependencyUpdateTool(&req)
+			result := checks.DependencyUpdateTool(&req)
 			// UPGRADEv2: to remove.
 			// Old version.
 			Expect(result.Error).Should(BeNil())

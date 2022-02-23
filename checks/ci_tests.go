@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/clients"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/clients"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
 const (
@@ -31,21 +31,29 @@ const (
 
 //nolint:gochecknoinits
 func init() {
-	registerCheck(CheckCITests, CITests)
+	supportedRequestTypes := []checker.RequestType{
+		checker.CommitBased,
+	}
+	if err := registerCheck(CheckCITests, CITests, supportedRequestTypes); err != nil {
+		// this should never happen
+		panic(err)
+	}
 }
 
 // CITests runs CI-Tests check.
 func CITests(c *checker.CheckRequest) checker.CheckResult {
-	prs, err := c.RepoClient.ListMergedPRs()
+	commits, err := c.RepoClient.ListCommits()
 	if err != nil {
-		e := sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("RepoClient.ListMergedPRs: %v", err))
+		e := sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("RepoClient.ListCommits: %v", err))
 		return checker.CreateRuntimeErrorResult(CheckCITests, e)
 	}
 
 	totalMerged := 0
 	totalTested := 0
-	for index := range prs {
-		pr := &prs[index]
+	for i := range commits {
+		pr := &commits[i].AssociatedMergeRequest
+		// TODO(#575): We ignore associated PRs if Scorecard is being run on a fork
+		// but the PR was created in the original repo.
 		if pr.MergedAt.IsZero() {
 			continue
 		}
@@ -75,7 +83,7 @@ func CITests(c *checker.CheckRequest) checker.CheckResult {
 		}
 
 		if !foundCI {
-			c.Dlogger.Debug3(&checker.LogMessage{
+			c.Dlogger.Debug(&checker.LogMessage{
 				Text: fmt.Sprintf("merged PR without CI test: %d", pr.Number),
 			})
 		}
@@ -100,8 +108,8 @@ func prHasSuccessStatus(pr *clients.PullRequest, c *checker.CheckRequest) (bool,
 		if status.State != success {
 			continue
 		}
-		if isTest(status.Context) {
-			c.Dlogger.Debug3(&checker.LogMessage{
+		if isTest(status.Context) || isTest(status.TargetURL) {
+			c.Dlogger.Debug(&checker.LogMessage{
 				Path: status.URL,
 				Type: checker.FileTypeURL,
 				Text: fmt.Sprintf("CI test found: pr: %d, context: %s", pr.Number,
@@ -119,9 +127,6 @@ func prHasSuccessfulCheck(pr *clients.PullRequest, c *checker.CheckRequest) (boo
 	if err != nil {
 		return false, sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("Client.Checks.ListCheckRunsForRef: %v", err))
 	}
-	if crs == nil {
-		return false, sce.WithMessage(sce.ErrScorecardInternal, "cannot list check runs by ref")
-	}
 
 	for _, cr := range crs {
 		if cr.Status != "completed" {
@@ -131,7 +136,7 @@ func prHasSuccessfulCheck(pr *clients.PullRequest, c *checker.CheckRequest) (boo
 			continue
 		}
 		if isTest(cr.App.Slug) {
-			c.Dlogger.Debug3(&checker.LogMessage{
+			c.Dlogger.Debug(&checker.LogMessage{
 				Path: cr.URL,
 				Type: checker.FileTypeURL,
 				Text: fmt.Sprintf("CI test found: pr: %d, context: %s", pr.Number,
@@ -143,13 +148,15 @@ func prHasSuccessfulCheck(pr *clients.PullRequest, c *checker.CheckRequest) (boo
 	return false, nil
 }
 
+// isTest returns true if the given string is a CI test.
 func isTest(s string) bool {
 	l := strings.ToLower(s)
 
 	// Add more patterns here!
 	for _, pattern := range []string{
 		"appveyor", "buildkite", "circleci", "e2e", "github-actions", "jenkins",
-		"mergeable", "test", "travis-ci",
+		"mergeable", "packit-as-a-service", "semaphoreci", "test", "travis-ci",
+		"flutter-dashboard", "Cirrus CI",
 	} {
 		if strings.Contains(l, pattern) {
 			return true

@@ -23,73 +23,30 @@ import (
 	opencensusstats "go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 
-	sce "github.com/ossf/scorecard/v3/errors"
-	"github.com/ossf/scorecard/v3/stats"
+	sce "github.com/ossf/scorecard/v4/errors"
+	"github.com/ossf/scorecard/v4/stats"
 )
 
 const checkRetries = 3
 
 // Runner runs a check with retries.
 type Runner struct {
-	CheckRequest CheckRequest
 	CheckName    string
 	Repo         string
+	CheckRequest CheckRequest
 }
 
 // CheckFn defined for convenience.
 type CheckFn func(*CheckRequest) CheckResult
 
+// Check defines a Scorecard check fn and its supported request types.
+type Check struct {
+	Fn                    CheckFn
+	SupportedRequestTypes []RequestType
+}
+
 // CheckNameToFnMap defined here for convenience.
-type CheckNameToFnMap map[string]CheckFn
-
-// UPGRADEv2: messages2 will ultimately
-// be renamed to messages.
-type logger struct {
-	messages2 []CheckDetail
-}
-
-func (l *logger) Info(desc string, args ...interface{}) {
-	cd := CheckDetail{Type: DetailInfo, Msg: LogMessage{Text: fmt.Sprintf(desc, args...)}}
-	l.messages2 = append(l.messages2, cd)
-}
-
-func (l *logger) Warn(desc string, args ...interface{}) {
-	cd := CheckDetail{Type: DetailWarn, Msg: LogMessage{Text: fmt.Sprintf(desc, args...)}}
-	l.messages2 = append(l.messages2, cd)
-}
-
-func (l *logger) Debug(desc string, args ...interface{}) {
-	cd := CheckDetail{Type: DetailDebug, Msg: LogMessage{Text: fmt.Sprintf(desc, args...)}}
-	l.messages2 = append(l.messages2, cd)
-}
-
-// UPGRADEv3: to rename.
-func (l *logger) Info3(msg *LogMessage) {
-	cd := CheckDetail{
-		Type: DetailInfo,
-		Msg:  *msg,
-	}
-	cd.Msg.Version = 3
-	l.messages2 = append(l.messages2, cd)
-}
-
-func (l *logger) Warn3(msg *LogMessage) {
-	cd := CheckDetail{
-		Type: DetailWarn,
-		Msg:  *msg,
-	}
-	cd.Msg.Version = 3
-	l.messages2 = append(l.messages2, cd)
-}
-
-func (l *logger) Debug3(msg *LogMessage) {
-	cd := CheckDetail{
-		Type: DetailDebug,
-		Msg:  *msg,
-	}
-	cd.Msg.Version = 3
-	l.messages2 = append(l.messages2, cd)
-}
+type CheckNameToFnMap map[string]Check
 
 func logStats(ctx context.Context, startTime time.Time, result *CheckResult) error {
 	runTimeInSecs := time.Now().Unix() - startTime.Unix()
@@ -106,7 +63,15 @@ func logStats(ctx context.Context, startTime time.Time, result *CheckResult) err
 }
 
 // Run runs a given check.
-func (r *Runner) Run(ctx context.Context, f CheckFn) CheckResult {
+func (r *Runner) Run(ctx context.Context, c Check) CheckResult {
+	// Sanity check.
+	unsupported := ListUnsupported(r.CheckRequest.RequiredTypes, c.SupportedRequestTypes)
+	if len(unsupported) != 0 {
+		return CreateRuntimeErrorResult(r.CheckName,
+			sce.WithMessage(sce.ErrorUnsupportedCheck,
+				fmt.Sprintf("requiredType: %s not supported by check %s", fmt.Sprint(unsupported), r.CheckName)))
+	}
+
 	ctx, err := tag.New(ctx, tag.Upsert(stats.CheckName, r.CheckName))
 	if err != nil {
 		panic(err)
@@ -120,18 +85,23 @@ func (r *Runner) Run(ctx context.Context, f CheckFn) CheckResult {
 		checkRequest.Ctx = ctx
 		l = logger{}
 		checkRequest.Dlogger = &l
-		res = f(&checkRequest)
+		res = c.Fn(&checkRequest)
 		if res.Error2 != nil && errors.Is(res.Error2, sce.ErrRepoUnreachable) {
-			checkRequest.Dlogger.Warn("%v", res.Error2)
+			checkRequest.Dlogger.Warn(&LogMessage{
+				Text: fmt.Sprintf("%v", res.Error2),
+			})
 			continue
 		}
 		break
 	}
 
-	res.Details2 = l.messages2
-	for _, d := range l.messages2 {
+	// Set details.
+	// TODO(#1393): Remove.
+	res.Details2 = l.Flush()
+	for _, d := range res.Details2 {
 		res.Details = append(res.Details, d.Msg.Text)
 	}
+
 	if err := logStats(ctx, startTime, &res); err != nil {
 		panic(err)
 	}

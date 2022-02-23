@@ -23,11 +23,10 @@ import (
 	"time"
 
 	"gocloud.dev/blob"
-
 	// Needed to link in GCP drivers.
 	_ "gocloud.dev/blob/gcsblob"
 
-	"github.com/ossf/scorecard/v3/cron/config"
+	"github.com/ossf/scorecard/v4/cron/config"
 )
 
 const (

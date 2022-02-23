@@ -14,18 +14,24 @@
 
 package checks
 
-/*
 import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/clients"
-	mockrepo "github.com/ossf/scorecard/v3/clients/mockclients"
-	sce "github.com/ossf/scorecard/v3/errors"
-	scut "github.com/ossf/scorecard/v3/utests"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/clients"
+	mockrepo "github.com/ossf/scorecard/v4/clients/mockclients"
+	sce "github.com/ossf/scorecard/v4/errors"
+	scut "github.com/ossf/scorecard/v4/utests"
 )
+
+func getBranchName(branch *clients.BranchRef) string {
+	if branch == nil || branch.Name == nil {
+		return ""
+	}
+	return *branch.Name
+}
 
 func getBranch(branches []*clients.BranchRef, name string) *clients.BranchRef {
 	for _, branch := range branches {
@@ -60,7 +66,9 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 	trueVal := true
 	falseVal := false
 	var zeroVal int32
+
 	var oneVal int32 = 1
+
 	//nolint
 	tests := []struct {
 		name          string
@@ -74,7 +82,7 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 			name: "Nil release and main branch names",
 			expected: scut.TestReturn{
 				Error:         nil,
-				Score:         -1,
+				Score:         checker.InconclusiveResultScore,
 				NumberOfWarn:  0,
 				NumberOfInfo:  0,
 				NumberOfDebug: 0,
@@ -85,9 +93,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      nil,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: clients.StatusChecksRule{
-							Strict:   &trueVal,
-							Contexts: []string{"foo"},
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &trueVal,
+							Contexts:             []string{"foo"},
 						},
 						RequiredPullRequestReviews: clients.PullRequestReviewRule{
 							DismissStaleReviews:          &trueVal,
@@ -104,9 +113,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      nil,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: clients.StatusChecksRule{
-							Strict:   &falseVal,
-							Contexts: nil,
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &falseVal,
+							Contexts:             nil,
 						},
 						RequiredPullRequestReviews: clients.PullRequestReviewRule{
 							DismissStaleReviews:          &falseVal,
@@ -127,8 +137,8 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 			name: "Only development branch",
 			expected: scut.TestReturn{
 				Error:         nil,
-				Score:         1,
-				NumberOfWarn:  6,
+				Score:         2,
+				NumberOfWarn:  5,
 				NumberOfInfo:  2,
 				NumberOfDebug: 0,
 			},
@@ -142,9 +152,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      &main,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: &clients.StatusChecksRule{
-							UpToDate: falseVal,
-							Contexts: nil,
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &falseVal,
+							Contexts:             nil,
 						},
 						RequiredPullRequestReviews: clients.PullRequestReviewRule{
 							DismissStaleReviews:          &falseVal,
@@ -164,9 +175,9 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 			name: "Take worst of release and development",
 			expected: scut.TestReturn{
 				Error:         nil,
-				Score:         5,
-				NumberOfWarn:  7,
-				NumberOfInfo:  10,
+				Score:         2,
+				NumberOfWarn:  6,
+				NumberOfInfo:  8,
 				NumberOfDebug: 0,
 			},
 			defaultBranch: main,
@@ -175,9 +186,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      &main,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: &clients.StatusChecksRule{
-							UpToDate: trueVal,
-							Contexts: []string{"foo"},
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &trueVal,
+							Contexts:             []string{"foo"},
 						},
 						RequiredPullRequestReviews: clients.PullRequestReviewRule{
 							DismissStaleReviews:          &trueVal,
@@ -194,9 +206,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      &rel1,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: &clients.StatusChecksRule{
-							UpToDate: falseVal,
-							Contexts: nil,
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &falseVal,
+							Contexts:             nil,
 						},
 						RequiredPullRequestReviews: clients.PullRequestReviewRule{
 							DismissStaleReviews:          &falseVal,
@@ -216,9 +229,9 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 			name: "Both release and development are OK",
 			expected: scut.TestReturn{
 				Error:         nil,
-				Score:         9,
+				Score:         8,
 				NumberOfWarn:  2,
-				NumberOfInfo:  16,
+				NumberOfInfo:  12,
 				NumberOfDebug: 0,
 			},
 			defaultBranch: main,
@@ -227,9 +240,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      &main,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: &clients.StatusChecksRule{
-							UpToDate: trueVal,
-							Contexts: []string{"foo"},
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &trueVal,
+							Contexts:             []string{"foo"},
 						},
 						RequiredPullRequestReviews: clients.PullRequestReviewRule{
 							DismissStaleReviews:          &trueVal,
@@ -246,9 +260,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      &rel1,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: &clients.StatusChecksRule{
-							UpToDate: trueVal,
-							Contexts: []string{"foo"},
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &trueVal,
+							Contexts:             []string{"foo"},
 						},
 						RequiredPullRequestReviews: clients.PullRequestReviewRule{
 							DismissStaleReviews:          &trueVal,
@@ -268,8 +283,8 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 			name: "Ignore a non-branch targetcommitish",
 			expected: scut.TestReturn{
 				Error:         nil,
-				Score:         1,
-				NumberOfWarn:  6,
+				Score:         2,
+				NumberOfWarn:  5,
 				NumberOfInfo:  2,
 				NumberOfDebug: 0,
 			},
@@ -280,9 +295,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      &main,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: &clients.StatusChecksRule{
-							UpToDate: falseVal,
-							Contexts: nil,
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &falseVal,
+							Contexts:             nil,
 						},
 						RequiredPullRequestReviews: clients.PullRequestReviewRule{
 							DismissStaleReviews:          &falseVal,
@@ -316,9 +332,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      &main,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: &clients.StatusChecksRule{
-							UpToDate: falseVal,
-							Contexts: nil,
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &falseVal,
+							Contexts:             nil,
 						},
 						RequiredPullRequestReviews: clients.PullRequestReviewRule{
 							DismissStaleReviews:          &falseVal,
@@ -338,9 +355,9 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 			expected: scut.TestReturn{
 				Error:         nil,
 				Score:         0,
-				NumberOfWarn:  2,
+				NumberOfWarn:  4,
 				NumberOfInfo:  0,
-				NumberOfDebug: 0,
+				NumberOfDebug: 6,
 			},
 			nonadmin:      true,
 			defaultBranch: main,
@@ -351,9 +368,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      &main,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: &clients.StatusChecksRule{
-							UpToDate: trueVal,
-							Contexts: []string{"foo"},
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &trueVal,
+							Contexts:             []string{"foo"},
 						},
 					},
 				},
@@ -361,9 +379,10 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					Name:      &rel1,
 					Protected: &trueVal,
 					BranchProtectionRule: clients.BranchProtectionRule{
-						RequiredStatusChecks: &clients.StatusChecksRule{
-							UpToDate: trueVal,
-							Contexts: []string{"foo"},
+						CheckRules: clients.StatusChecksRule{
+							RequiresStatusChecks: &trueVal,
+							UpToDateBeforeMerge:  &trueVal,
+							Contexts:             []string{"foo"},
 						},
 					},
 				},
@@ -404,7 +423,11 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 					return tt.branches, nil
 				}).AnyTimes()
 			dl := scut.TestDetailLogger{}
-			r := checkReleaseAndDevBranchProtection(mockRepoClient, &dl)
+			req := checker.CheckRequest{
+				Dlogger:    &dl,
+				RepoClient: mockRepoClient,
+			}
+			r := BranchProtection(&req)
 			if !scut.ValidateTestReturn(t, tt.name, &tt.expected, &r, &dl) {
 				t.Fail()
 			}
@@ -412,268 +435,3 @@ func TestReleaseAndDevBranchProtected(t *testing.T) {
 		})
 	}
 }
-
-func TestIsBranchProtected(t *testing.T) {
-	t.Parallel()
-	trueVal := true
-	falseVal := false
-	var zeroVal int32
-	var oneVal int32 = 1
-
-	tests := []struct {
-		name       string
-		protection *clients.BranchProtectionRule
-		expected   scut.TestReturn
-	}{
-		{
-			name: "Nothing is enabled",
-			expected: scut.TestReturn{
-				Error:         nil,
-				Score:         1,
-				NumberOfWarn:  6,
-				NumberOfInfo:  2,
-				NumberOfDebug: 0,
-			},
-			protection: &clients.BranchProtectionRule{
-				RequiredStatusChecks: &clients.StatusChecksRule{
-					UpToDate: falseVal,
-					Contexts: nil,
-				},
-				RequiredPullRequestReviews: clients.PullRequestReviewRule{
-					DismissStaleReviews:          &falseVal,
-					RequireCodeOwnerReviews:      &falseVal,
-					RequiredApprovingReviewCount: &zeroVal,
-				},
-				EnforceAdmins:        &falseVal,
-				RequireLinearHistory: &falseVal,
-				AllowForcePushes:     &falseVal,
-				AllowDeletions:       &falseVal,
-			},
-		},
-		{
-			name: "Nothing is enabled and values in github.Protection are nil",
-			expected: scut.TestReturn{
-				Error:         nil,
-				Score:         0,
-				NumberOfWarn:  1,
-				NumberOfInfo:  0,
-				NumberOfDebug: 0,
-			},
-			protection: &clients.BranchProtectionRule{},
-		},
-		{
-			name: "Required status check enabled",
-			expected: scut.TestReturn{
-				Error:         nil,
-				Score:         2,
-				NumberOfWarn:  5,
-				NumberOfInfo:  4,
-				NumberOfDebug: 0,
-			},
-			protection: &clients.BranchProtectionRule{
-				RequiredStatusChecks: &clients.StatusChecksRule{
-					UpToDate: trueVal,
-					Contexts: []string{"foo"},
-				},
-				RequiredPullRequestReviews: clients.PullRequestReviewRule{
-					DismissStaleReviews:          &falseVal,
-					RequireCodeOwnerReviews:      &falseVal,
-					RequiredApprovingReviewCount: &zeroVal,
-				},
-				EnforceAdmins:        &falseVal,
-				RequireLinearHistory: &falseVal,
-				AllowForcePushes:     &falseVal,
-				AllowDeletions:       &falseVal,
-			},
-		},
-		{
-			name: "Required status check enabled without checking for status string",
-			expected: scut.TestReturn{
-				Error:         nil,
-				Score:         2,
-				NumberOfWarn:  6,
-				NumberOfInfo:  3,
-				NumberOfDebug: 0,
-			},
-			protection: &clients.BranchProtectionRule{
-				RequiredStatusChecks: &clients.StatusChecksRule{
-					UpToDate: trueVal,
-					Contexts: nil,
-				},
-				RequiredPullRequestReviews: clients.PullRequestReviewRule{
-					DismissStaleReviews:          &falseVal,
-					RequireCodeOwnerReviews:      &falseVal,
-					RequiredApprovingReviewCount: &zeroVal,
-				},
-				EnforceAdmins:        &falseVal,
-				RequireLinearHistory: &falseVal,
-				AllowForcePushes:     &falseVal,
-				AllowDeletions:       &falseVal,
-			},
-		},
-		{
-			name: "Required pull request enabled",
-			expected: scut.TestReturn{
-				Error:         nil,
-				Score:         2,
-				NumberOfWarn:  5,
-				NumberOfInfo:  3,
-				NumberOfDebug: 0,
-			},
-			protection: &clients.BranchProtectionRule{
-				RequiredStatusChecks: &clients.StatusChecksRule{
-					UpToDate: falseVal,
-					Contexts: []string{"foo"},
-				},
-				RequiredPullRequestReviews: clients.PullRequestReviewRule{
-					DismissStaleReviews:          &falseVal,
-					RequireCodeOwnerReviews:      &falseVal,
-					RequiredApprovingReviewCount: &oneVal,
-				},
-				EnforceAdmins:        &falseVal,
-				RequireLinearHistory: &trueVal,
-				AllowForcePushes:     &falseVal,
-				AllowDeletions:       &falseVal,
-			},
-		},
-		{
-			name: "Required admin enforcement enabled",
-			expected: scut.TestReturn{
-				Error:         nil,
-				Score:         3,
-				NumberOfWarn:  5,
-				NumberOfInfo:  3,
-				NumberOfDebug: 0,
-			},
-			protection: &clients.BranchProtectionRule{
-				RequiredStatusChecks: &clients.StatusChecksRule{
-					UpToDate: falseVal,
-					Contexts: []string{"foo"},
-				},
-				RequiredPullRequestReviews: clients.PullRequestReviewRule{
-					DismissStaleReviews:          &falseVal,
-					RequireCodeOwnerReviews:      &falseVal,
-					RequiredApprovingReviewCount: &zeroVal,
-				},
-				EnforceAdmins:        &trueVal,
-				RequireLinearHistory: &falseVal,
-				AllowForcePushes:     &falseVal,
-				AllowDeletions:       &falseVal,
-			},
-		},
-		{
-			name: "Required linear history enabled",
-			expected: scut.TestReturn{
-				Error:         nil,
-				Score:         2,
-				NumberOfWarn:  5,
-				NumberOfInfo:  3,
-				NumberOfDebug: 0,
-			},
-			protection: &clients.BranchProtectionRule{
-				RequiredStatusChecks: &clients.StatusChecksRule{
-					UpToDate: falseVal,
-					Contexts: []string{"foo"},
-				},
-				RequiredPullRequestReviews: clients.PullRequestReviewRule{
-					DismissStaleReviews:          &falseVal,
-					RequireCodeOwnerReviews:      &falseVal,
-					RequiredApprovingReviewCount: &zeroVal,
-				},
-				EnforceAdmins:        &falseVal,
-				RequireLinearHistory: &trueVal,
-				AllowForcePushes:     &falseVal,
-				AllowDeletions:       &falseVal,
-			},
-		},
-		{
-			name: "Allow force push enabled",
-			expected: scut.TestReturn{
-				Error:         nil,
-				Score:         0,
-				NumberOfWarn:  7,
-				NumberOfInfo:  1,
-				NumberOfDebug: 0,
-			},
-			protection: &clients.BranchProtectionRule{
-				RequiredStatusChecks: &clients.StatusChecksRule{
-					UpToDate: falseVal,
-					Contexts: []string{"foo"},
-				},
-				RequiredPullRequestReviews: clients.PullRequestReviewRule{
-					DismissStaleReviews:          &falseVal,
-					RequireCodeOwnerReviews:      &falseVal,
-					RequiredApprovingReviewCount: &zeroVal,
-				},
-				EnforceAdmins:        &falseVal,
-				RequireLinearHistory: &falseVal,
-				AllowForcePushes:     &trueVal,
-				AllowDeletions:       &falseVal,
-			},
-		},
-		{
-			name: "Allow deletions enabled",
-			expected: scut.TestReturn{
-				Error:         nil,
-				Score:         0,
-				NumberOfWarn:  7,
-				NumberOfInfo:  1,
-				NumberOfDebug: 0,
-			},
-			protection: &clients.BranchProtectionRule{
-				RequiredStatusChecks: &clients.StatusChecksRule{
-					UpToDate: falseVal,
-					Contexts: []string{"foo"},
-				},
-				RequiredPullRequestReviews: clients.PullRequestReviewRule{
-					DismissStaleReviews:          &falseVal,
-					RequireCodeOwnerReviews:      &falseVal,
-					RequiredApprovingReviewCount: &zeroVal,
-				},
-				EnforceAdmins:        &falseVal,
-				RequireLinearHistory: &falseVal,
-				AllowForcePushes:     &falseVal,
-				AllowDeletions:       &trueVal,
-			},
-		},
-		{
-			name: "Branches are protected",
-			expected: scut.TestReturn{
-				Error:         nil,
-				Score:         9,
-				NumberOfWarn:  1,
-				NumberOfInfo:  8,
-				NumberOfDebug: 0,
-			},
-			protection: &clients.BranchProtectionRule{
-				RequiredStatusChecks: &clients.StatusChecksRule{
-					UpToDate: trueVal,
-					Contexts: []string{"foo"},
-				},
-				RequiredPullRequestReviews: clients.PullRequestReviewRule{
-					DismissStaleReviews:          &trueVal,
-					RequireCodeOwnerReviews:      &trueVal,
-					RequiredApprovingReviewCount: &oneVal,
-				},
-				EnforceAdmins:        &trueVal,
-				RequireLinearHistory: &trueVal,
-				AllowForcePushes:     &falseVal,
-				AllowDeletions:       &falseVal,
-			},
-		},
-	}
-	for _, tt := range tests {
-		tt := tt // Re-initializing variable so it is not changed while executing the closure below
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			dl := scut.TestDetailLogger{}
-			actual := &checker.CheckResult{
-				Score: isBranchProtected(tt.protection, "test", &dl),
-			}
-			if !scut.ValidateTestReturn(t, tt.name, &tt.expected, actual, &dl) {
-				t.Fail()
-			}
-		})
-	}
-}
-*/
