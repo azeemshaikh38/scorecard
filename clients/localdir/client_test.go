@@ -23,9 +23,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"go.uber.org/zap/zapcore"
 
-	"github.com/ossf/scorecard/v3/clients/githubrepo"
+	"github.com/ossf/scorecard/v4/clients"
+	"github.com/ossf/scorecard/v4/log"
 )
 
 func TestClient_CreationAndCaching(t *testing.T) {
@@ -39,13 +39,13 @@ func TestClient_CreationAndCaching(t *testing.T) {
 		{
 			name:        "invalid fullpath",
 			outputFiles: []string{},
-			inputFolder: "file:///invalid/fullpath",
+			inputFolder: "invalid/fullpath",
 			err:         os.ErrNotExist,
 		},
 		{
 			name:        "invalid relative path",
 			outputFiles: []string{},
-			inputFolder: "file://invalid/relative/path",
+			inputFolder: "invalid/relative/path",
 			err:         os.ErrNotExist,
 		},
 		{
@@ -53,7 +53,7 @@ func TestClient_CreationAndCaching(t *testing.T) {
 			outputFiles: []string{
 				"file0", "dir1/file1", "dir1/dir2/file2",
 			},
-			inputFolder: "file://testdata/repo0",
+			inputFolder: "testdata/repo0",
 			err:         nil,
 		},
 	}
@@ -63,12 +63,7 @@ func TestClient_CreationAndCaching(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			logger, err := githubrepo.NewLogger(zapcore.DebugLevel)
-			if err != nil {
-				t.Errorf("githubrepo.NewLogger: %v", err)
-			}
-			// nolint
-			defer logger.Sync() // Flushes buffer, if any.
+			logger := log.NewLogger(log.DebugLevel)
 
 			// Create repo.
 			repo, err := MakeLocalDirRepo(tt.inputFolder)
@@ -81,7 +76,7 @@ func TestClient_CreationAndCaching(t *testing.T) {
 			}
 
 			client := CreateLocalDirClient(ctx, logger)
-			if err := client.InitRepo(repo); err != nil {
+			if err := client.InitRepo(repo, clients.HeadSHA); err != nil {
 				t.Errorf("InitRepo: %v", err)
 			}
 

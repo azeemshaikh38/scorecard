@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-RUN go get github.com@some_tag
-RUN go install github.com@some_tag
-RUN ["go", "install", "github.com@tag"]
+RUN go get github.com/org/name@some_tag
+RUN go install github.com/org/name@some_tag
+RUN ["go", "install", "github.com/org/name@tag"]
 RUN ["go", "install"]
 
-RUN go install github.com@some_tag
-RUN go get github.com@some_tag
-RUN go get github.com@1111111111ccccccccccaaaaaaaaaa9999999999
-RUN go get github.com@1111111111ccccccccccaaaaaaaaaa9999999999
-RUN ["go", "install", "-Y", "github.com@1111111111ccccccccccaaaaaaaaaa9999999999"]
-RUN ["go", "get", "github.com@1111111111ccccccccccaaaaaaaaaa9999999999"]
+RUN go install github.com/org/name@some_tag
+RUN go get github.com/org/name@some_tag
+RUN go get github.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999
+RUN go get github.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999
+RUN ["go", "install", "-Y", "github.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999"]
+RUN ["go", "get", "github.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999"]
 
+RUN go install /some/local/path
 RUN go mod download
 RUN go build -a bla
 
@@ -37,6 +38,12 @@ RUN pip install
 RUN pip3 install
 RUN pip install -r any_file
 RUN pip3 install -r bla-requirements.txt
+RUN ["pip", "install", "-r", "requirements.txt", "--require-hashes"]
+RUN ["pip3", "install", "-r", "requirements.txt", "--require-hashes"]
+RUN ["/bin/pip", "install", "--upgrade", "-r", "requirements.txt"]
+RUN ["/bin/pip", "install", "--upgrade"]
+RUN pip3 install -r bla-requirements.txt --require-hashes
+RUN pip3 install --require-hashes -r bla-requirements.txt
 
 RUN pip install somepkg
 RUN pip3 install somepkg==1.2.3
@@ -65,13 +72,13 @@ RUN python -m pip install -r file
 RUN python -m pip install 'some-pkg==1.2.3'
 RUN python -m pip install 'some-pkg>1.2.3'
 
-# These first 3 should not result in findings.
-RUN npm install
-RUN npm install -g
-RUN npm i
-
-# These 4 result in findings.
 RUN npm install typescript
 RUN npm install -g typescript
 RUN npm i typescript
 RUN npm i -g typescript
+RUN npm install
+RUN npm install -g
+RUN npm i
+RUN npm ci
+RUN npm install-test
+RUN npm install-ci-test

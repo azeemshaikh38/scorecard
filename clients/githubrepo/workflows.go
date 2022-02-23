@@ -17,29 +17,32 @@ package githubrepo
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/go-github/v38/github"
 
-	"github.com/ossf/scorecard/v3/clients"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/clients"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
 type workflowsHandler struct {
-	client *github.Client
-	ctx    context.Context
-	owner  string
-	repo   string
+	client  *github.Client
+	ctx     context.Context
+	repourl *repoURL
 }
 
-func (handler *workflowsHandler) init(ctx context.Context, owner, repo string) {
+func (handler *workflowsHandler) init(ctx context.Context, repourl *repoURL) {
 	handler.ctx = ctx
-	handler.owner = owner
-	handler.repo = repo
+	handler.repourl = repourl
 }
 
 func (handler *workflowsHandler) listSuccessfulWorkflowRuns(filename string) ([]clients.WorkflowRun, error) {
+	if !strings.EqualFold(handler.repourl.commitSHA, clients.HeadSHA) {
+		return nil, fmt.Errorf(
+			"%w: ListWorkflowRunsByFileName only supported for HEAD queries", clients.ErrUnsupportedFeature)
+	}
 	workflowRuns, _, err := handler.client.Actions.ListWorkflowRunsByFileName(
-		handler.ctx, handler.owner, handler.repo, filename, &github.ListWorkflowRunsOptions{
+		handler.ctx, handler.repourl.owner, handler.repourl.repo, filename, &github.ListWorkflowRunsOptions{
 			Status: "success",
 		})
 	if err != nil {

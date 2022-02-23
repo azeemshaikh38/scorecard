@@ -15,10 +15,10 @@
 package checks
 
 import (
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/checks/evaluation"
-	"github.com/ossf/scorecard/v3/checks/raw"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/checks/evaluation"
+	"github.com/ossf/scorecard/v4/checks/raw"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
 // CheckBinaryArtifacts is the exported name for Binary-Artifacts check.
@@ -26,16 +26,30 @@ const CheckBinaryArtifacts string = "Binary-Artifacts"
 
 //nolint
 func init() {
-	registerCheck(CheckBinaryArtifacts, BinaryArtifacts)
+	var supportedRequestTypes = []checker.RequestType{
+		checker.FileBased,
+		checker.CommitBased,
+	}
+	if err := registerCheck(CheckBinaryArtifacts, BinaryArtifacts, supportedRequestTypes); err != nil {
+		// this should never happen
+		panic(err)
+	}
 }
 
 // BinaryArtifacts  will check the repository contains binary artifacts.
 func BinaryArtifacts(c *checker.CheckRequest) checker.CheckResult {
-	rawData, err := raw.BinaryArtifacts(c)
+	rawData, err := raw.BinaryArtifacts(c.RepoClient)
 	if err != nil {
 		e := sce.WithMessage(sce.ErrScorecardInternal, err.Error())
 		return checker.CreateRuntimeErrorResult(CheckBinaryArtifacts, e)
 	}
 
+	// Return raw results.
+	if c.RawResults != nil {
+		c.RawResults.BinaryArtifactResults = rawData
+		return checker.CheckResult{}
+	}
+
+	// Return the score evaluation.
 	return evaluation.BinaryArtifacts(CheckBinaryArtifacts, c.Dlogger, &rawData)
 }

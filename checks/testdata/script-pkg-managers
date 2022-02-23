@@ -13,16 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-go get github.com@some_tag
-go install github.com@some_tag
+go get github.com/org/name@some_tag
+go install github.com/org/name@some_tag
 go install
 
-/bin/go install github.com@some_tag
-go get github.com@some_tag
-go get github.com@1111111111ccccccccccaaaaaaaaaa9999999999
-go get github.com@1111111111ccccccccccaaaaaaaaaa9999999999
-go install -Y github.com@1111111111ccccccccccaaaaaaaaaa9999999999
-go get github.com@1111111111ccccccccccaaaaaaaaaa9999999999
+/bin/go install github.com/org/name@some_tag
+go get github.com/org/name@some_tag
+go get github.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999
+go get somerepo.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999
+go get another-repo.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999
+go get somerepo.com/org/name@v1.2.3
+go get another-repo.com/org/name@release
+go get local-folder
+go get ./local-folder
+go get /some/local/folder
+go get ../../some/local/folder
+go get github.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999
+go install -Y github.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999
+go get github.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999
 
 go mod download
 go build -a bla
@@ -34,6 +42,8 @@ pip3 install
 pip install
 pip install -r any_file
 pip3 install -r bla-requirements.txt
+pip3 install -r bla-requirements.txt --require-hashes
+pip3 install --require-hashes -r bla-requirements.txt
 
 pip install somepkg
 pip3 install somepkg==1.2.3
@@ -63,13 +73,14 @@ python3 -m pip install -X -H somepkg \
     'some-ther==1.2.3' \
     'somebla<3.4.5'
 
-# These first 3 should not result in findings.
-npm install
-npm install -g
-npm i
 
-# These 4 result in findings.
 npm install typescript
 npm install -g typescript
 npm i typescript
 npm i -g typescript
+npm install
+npm install -g
+npm i
+npm ci
+npm install-test
+npm install-ci-test

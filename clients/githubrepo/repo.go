@@ -19,8 +19,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/ossf/scorecard/v3/clients"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/clients"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
 const (
@@ -28,8 +28,8 @@ const (
 )
 
 type repoURL struct {
-	host, owner, repo string
-	metadata          []string
+	host, owner, repo, defaultBranch, commitSHA string
+	metadata                                    []string
 }
 
 // Parses input string into repoURL struct.

@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ossf/scorecard/v3/checker"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/checker"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
 const (
@@ -31,7 +31,10 @@ const (
 
 //nolint:gochecknoinits
 func init() {
-	registerCheck(CheckContributors, Contributors)
+	if err := registerCheck(CheckContributors, Contributors, nil); err != nil {
+		// this should never happen
+		panic(err)
+	}
 }
 
 // Contributors run Contributors check.
@@ -70,7 +73,7 @@ func Contributors(c *checker.CheckRequest) checker.CheckResult {
 		names = append(names, c)
 	}
 
-	c.Dlogger.Info3(&checker.LogMessage{
+	c.Dlogger.Info(&checker.LogMessage{
 		Text: fmt.Sprintf("contributors work for: %v", strings.Join(names, ",")),
 	})
 

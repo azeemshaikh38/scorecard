@@ -15,14 +15,13 @@
 package evaluation
 
 import (
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/checks/raw"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/checker"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
-// BinaryArtifacts applies the score policy for the Binary-Artiacts check.
+// BinaryArtifacts applies the score policy for the Binary-Artifacts check.
 func BinaryArtifacts(name string, dl checker.DetailLogger,
-	r *raw.BinaryArtifactData) checker.CheckResult {
+	r *checker.BinaryArtifactData) checker.CheckResult {
 	if r == nil {
 		e := sce.WithMessage(sce.ErrScorecardInternal, "empty raw data")
 		return checker.CreateRuntimeErrorResult(name, e)
@@ -33,12 +32,20 @@ func BinaryArtifacts(name string, dl checker.DetailLogger,
 		return checker.CreateMaxScoreResult(name, "no binaries found in the repo")
 	}
 
+	score := checker.MaxResultScore
 	for _, f := range r.Files {
-		dl.Warn3(&checker.LogMessage{
+		dl.Warn(&checker.LogMessage{
 			Path: f.Path, Type: checker.FileTypeBinary,
-			Text: "binary detected",
+			Offset: f.Offset,
+			Text:   "binary detected",
 		})
+		// We remove one point for each binary.
+		score--
 	}
 
-	return checker.CreateMinScoreResult(name, "binaries present in source code")
+	if score < checker.MinResultScore {
+		score = checker.MinResultScore
+	}
+
+	return checker.CreateResultWithScore(name, "binaries present in source code", score)
 }

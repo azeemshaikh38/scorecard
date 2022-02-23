@@ -22,78 +22,64 @@ import (
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/types"
 
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/checks/fileparser"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/checks/fileparser"
+	"github.com/ossf/scorecard/v4/clients"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
-// File represents a file.
-type File struct {
-	Path string
-	// TODO: add hash if needed.
-}
-
-// BinaryArtifactData contains the raw results.
-type BinaryArtifactData struct {
-	// Files contains a list of files.
-	Files []File
-}
-
 // BinaryArtifacts retrieves the raw data for the Binary-Artifacts check.
-func BinaryArtifacts(c *checker.CheckRequest) (BinaryArtifactData, error) {
-	var files []File
-	err := fileparser.CheckFilesContentV6("*", false, c.RepoClient, checkBinaryFileContent, &files)
+func BinaryArtifacts(c clients.RepoClient) (checker.BinaryArtifactData, error) {
+	files := []checker.File{}
+	err := fileparser.OnMatchingFileContentDo(c, fileparser.PathMatcher{
+		Pattern:       "*",
+		CaseSensitive: false,
+	}, checkBinaryFileContent, &files)
 	if err != nil {
-		return BinaryArtifactData{}, err
+		return checker.BinaryArtifactData{}, fmt.Errorf("%w", err)
 	}
 
 	// No error, return the files.
-	return BinaryArtifactData{Files: files}, nil
+	return checker.BinaryArtifactData{Files: files}, nil
 }
 
-func checkBinaryFileContent(path string, content []byte,
-	data fileparser.FileCbData) (bool, error) {
-	pfiles, ok := data.(*[]File)
+var checkBinaryFileContent fileparser.DoWhileTrueOnFileContent = func(path string, content []byte,
+	args ...interface{}) (bool, error) {
+	if len(args) != 1 {
+		return false, fmt.Errorf(
+			"checkBinaryFileContent requires exactly one argument: %w", errInvalidArgLength)
+	}
+	pfiles, ok := args[0].(*[]checker.File)
 	if !ok {
-		// This never happens.
-		panic("invalid type")
+		return false, fmt.Errorf(
+			"checkBinaryFileContent requires argument of type *[]checker.File: %w", errInvalidArgType)
 	}
 
 	binaryFileTypes := map[string]bool{
-		"crx":     true,
-		"deb":     true,
-		"dex":     true,
-		"dey":     true,
-		"elf":     true,
-		"o":       true,
-		"so":      true,
-		"iso":     true,
-		"class":   true,
-		"jar":     true,
-		"bundle":  true,
-		"dylib":   true,
-		"lib":     true,
-		"msi":     true,
-		"acm":     true,
-		"ax":      true,
-		"cpl":     true,
-		"dll":     true,
-		"drv":     true,
-		"efi":     true,
-		"exe":     true,
-		"mui":     true,
-		"ocx":     true,
-		"scr":     true,
-		"sys":     true,
-		"tsp":     true,
-		"pyc":     true,
-		"pyo":     true,
-		"par":     true,
-		"rpm":     true,
-		"swf":     true,
-		"torrent": true,
-		"cab":     true,
-		"whl":     true,
+		"crx":    true,
+		"deb":    true,
+		"dex":    true,
+		"dey":    true,
+		"elf":    true,
+		"o":      true,
+		"so":     true,
+		"iso":    true,
+		"class":  true,
+		"jar":    true,
+		"bundle": true,
+		"dylib":  true,
+		"lib":    true,
+		"msi":    true,
+		"dll":    true,
+		"drv":    true,
+		"efi":    true,
+		"exe":    true,
+		"ocx":    true,
+		"pyc":    true,
+		"pyo":    true,
+		"par":    true,
+		"rpm":    true,
+		"whl":    true,
 	}
 	var t types.Type
 	var err error
@@ -107,8 +93,10 @@ func checkBinaryFileContent(path string, content []byte,
 	exists1 := binaryFileTypes[t.Extension]
 	exists2 := binaryFileTypes[strings.ReplaceAll(filepath.Ext(path), ".", "")]
 	if exists1 || exists2 {
-		*pfiles = append(*pfiles, File{
-			Path: path,
+		*pfiles = append(*pfiles, checker.File{
+			Path:   path,
+			Type:   checker.FileTypeBinary,
+			Offset: checker.OffsetDefault,
 		})
 	}
 

@@ -18,15 +18,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	_ "net/http/pprof" // nolint:gosec
 
-	// nolint:gosec
-	_ "net/http/pprof"
-
-	"go.uber.org/zap/zapcore"
-
-	docs "github.com/ossf/scorecard/v3/docs/checks"
-	sce "github.com/ossf/scorecard/v3/errors"
-	"github.com/ossf/scorecard/v3/pkg"
+	docs "github.com/ossf/scorecard/v4/docs/checks"
+	sce "github.com/ossf/scorecard/v4/errors"
+	"github.com/ossf/scorecard/v4/log"
+	"github.com/ossf/scorecard/v4/pkg"
 )
 
 //nolint
@@ -87,7 +84,7 @@ type jsonScorecardResultV2 struct {
 }
 
 // AsJSON exports results as JSON for new detail format.
-func AsJSON(r *pkg.ScorecardResult, showDetails bool, logLevel zapcore.Level, writer io.Writer) error {
+func AsJSON(r *pkg.ScorecardResult, showDetails bool, logLevel log.Level, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
 
 	out := jsonScorecardResult{
@@ -123,7 +120,7 @@ func AsJSON(r *pkg.ScorecardResult, showDetails bool, logLevel zapcore.Level, wr
 
 // AsJSON2 exports results as JSON for the cron job and in the new detail format.
 func AsJSON2(r *pkg.ScorecardResult, showDetails bool,
-	logLevel zapcore.Level, checkDocs docs.Doc, writer io.Writer) error {
+	logLevel log.Level, checkDocs docs.Doc, writer io.Writer) error {
 	score, err := r.GetAggregateScore(checkDocs)
 	if err != nil {
 		//nolint:wrapcheck

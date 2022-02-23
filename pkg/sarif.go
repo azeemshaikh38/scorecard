@@ -22,12 +22,15 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap/zapcore"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
-	"github.com/ossf/scorecard/v3/checker"
-	docs "github.com/ossf/scorecard/v3/docs/checks"
-	sce "github.com/ossf/scorecard/v3/errors"
-	spol "github.com/ossf/scorecard/v3/policy"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/checks"
+	docs "github.com/ossf/scorecard/v4/docs/checks"
+	sce "github.com/ossf/scorecard/v4/errors"
+	"github.com/ossf/scorecard/v4/log"
+	spol "github.com/ossf/scorecard/v4/policy"
 )
 
 type text struct {
@@ -36,12 +39,12 @@ type text struct {
 
 //nolint
 type region struct {
-	StartLine   *int `json:"startLine,omitempty"`
-	EndLine     *int `json:"endLine,omitempty"`
-	StartColumn *int `json:"startColumn,omitempty"`
-	EndColumn   *int `json:"endColumn,omitempty"`
-	CharOffset  *int `json:"charOffset,omitempty"`
-	ByteOffset  *int `json:"byteOffset,omitempty"`
+	StartLine   *uint `json:"startLine,omitempty"`
+	EndLine     *uint `json:"endLine,omitempty"`
+	StartColumn *uint `json:"startColumn,omitempty"`
+	EndColumn   *uint `json:"endColumn,omitempty"`
+	CharOffset  *uint `json:"charOffset,omitempty"`
+	ByteOffset  *uint `json:"byteOffset,omitempty"`
 	// Use pointer to omit the entire structure.
 	Snippet *text `json:"snippet,omitempty"`
 }
@@ -61,8 +64,6 @@ type location struct {
 	PhysicalLocation physicalLocation `json:"physicalLocation"`
 	//nolint
 	// This is optional https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/sarif-support-for-code-scanning#location-object.
-	// We may populate it later if we can indicate which config file
-	// line was violated by the failing check.
 	Message *text `json:"message,omitempty"`
 }
 
@@ -153,7 +154,7 @@ type sarif210 struct {
 	Runs    []run  `json:"runs"`
 }
 
-func maxOffset(x, y int) int {
+func maxOffset(x, y uint) uint {
 	if x < y {
 		return y
 	}
@@ -208,13 +209,6 @@ func detailToRegion(details *checker.CheckDetail) region {
 		snippet = &text{Text: details.Msg.Snippet}
 	}
 
-	// This should never happen unless
-	// the check is buggy. We want to catch it
-	// quickly and not fail silently.
-	if details.Msg.Offset < 0 {
-		panic("invalid offset")
-	}
-
 	// https://github.com/github/codeql-action/issues/754.
 	// "code-scanning currently only supports character offset/length and start/end line/columns offsets".
 
@@ -226,7 +220,7 @@ func detailToRegion(details *checker.CheckDetail) region {
 	default:
 		panic("invalid")
 	case checker.FileTypeURL:
-		line := maxOffset(1, details.Msg.Offset)
+		line := maxOffset(checker.OffsetDefault, details.Msg.Offset)
 		reg = region{
 			StartLine: &line,
 			Snippet:   snippet,
@@ -234,22 +228,24 @@ func detailToRegion(details *checker.CheckDetail) region {
 	case checker.FileTypeNone:
 		// Do nothing.
 	case checker.FileTypeSource:
-		line := maxOffset(1, details.Msg.Offset)
+		startLine := maxOffset(checker.OffsetDefault, details.Msg.Offset)
+		endLine := maxOffset(startLine, details.Msg.EndOffset)
 		reg = region{
-			StartLine: &line,
+			StartLine: &startLine,
+			EndLine:   &endLine,
 			Snippet:   snippet,
 		}
 	case checker.FileTypeText:
-		// Offset of 0 is acceptable here.
 		reg = region{
 			CharOffset: &details.Msg.Offset,
 			Snippet:    snippet,
 		}
 	case checker.FileTypeBinary:
-		// Offset of 0 is acceptable here.
 		reg = region{
-			// Note: GitHub does not support this.
+			// Note: GitHub does not support ByteOffset, so we also set
+			// StartLine.
 			ByteOffset: &details.Msg.Offset,
+			StartLine:  &details.Msg.Offset,
 		}
 	}
 	return reg
@@ -318,7 +314,7 @@ func addDefaultLocation(locs []location, policyFile string) []location {
 		return locs
 	}
 
-	detaultLine := 1
+	detaultLine := checker.OffsetDefault
 	loc := location{
 		PhysicalLocation: physicalLocation{
 			ArtifactLocation: artifactLocation{
@@ -346,9 +342,11 @@ func createSARIFHeader() sarif210 {
 }
 
 func createSARIFTool(url, name, version string) tool {
+	titleCaser := cases.Title(language.English)
+
 	return tool{
 		Driver: driver{
-			Name:           strings.Title(name),
+			Name:           titleCaser.String(name),
 			InformationURI: url,
 			SemVersion:     version,
 			Rules:          nil,
@@ -395,7 +393,7 @@ func generateRemediationMarkdown(remediation []string) string {
 func generateMarkdownText(longDesc, risk string, remediation []string) string {
 	rSev := fmt.Sprintf("**Severity**: %s", risk)
 	rDesc := fmt.Sprintf("**Details**:\n%s", longDesc)
-	rRem := fmt.Sprintf("**Remediation**:\n%s", generateRemediationMarkdown(remediation))
+	rRem := fmt.Sprintf("**Remediation (click \"Show more\" below)**:\n%s", generateRemediationMarkdown(remediation))
 	return textToMarkdown(fmt.Sprintf("%s\n\n%s\n\n%s", rRem, rSev, rDesc))
 }
 
@@ -430,7 +428,7 @@ func createSARIFCheckResult(pos int, checkID, message string, loc *location) res
 		// https://github.com/microsoft/sarif-tutorials/blob/main/docs/2-Basics.md#level
 		// Level:     scoreToLevel(minScore, score),
 		RuleIndex: pos,
-		Message:   text{Text: message},
+		Message:   text{Text: fmt.Sprintf("%s\nClick Remediation section below to solve this issue", message)},
 		Locations: []location{*loc},
 	}
 }
@@ -457,11 +455,15 @@ func contains(l []string, elt string) bool {
 	return false
 }
 
-func computeCategory(repos []string) (string, error) {
+func computeCategory(checkName string, repos []string) (string, error) {
 	// In terms of sets, local < Git-local < GitHub.
 	switch {
 	default:
 		return "", sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("repo types not supported: %v", repos))
+	case checkName == checks.CheckBranchProtection:
+		// This is a special case to be give us more flexibility to move this check around
+		// and run it on different GitHub triggers.
+		return strings.ToLower(checks.CheckBranchProtection), nil
 	case contains(repos, "local"):
 		return "local", nil
 	// Note: Git-local is not supported by any checks yet.
@@ -489,10 +491,38 @@ func createSARIFRuns(runs map[string]*run) []run {
 	return res
 }
 
+func createCheckIdentifiers(name string) (string, string) {
+	// Identifier must be in Pascal case.
+	// We keep the check name the same as the one used in the documentation.
+	n := strings.ReplaceAll(name, "-", "")
+	return name, fmt.Sprintf("%sID", n)
+}
+
+func filterOutDetailType(details []checker.CheckDetail, t checker.DetailType) []checker.CheckDetail {
+	ret := make([]checker.CheckDetail, 0)
+	for i := range details {
+		d := details[i]
+		if d.Type == t {
+			continue
+		}
+		ret = append(ret, d)
+	}
+	return ret
+}
+
+func createDefaultLocationMessage(check *checker.CheckResult, score int) string {
+	details := filterOutDetailType(check.Details2, checker.DetailInfo)
+	s, b := detailsToString(details, log.WarnLevel)
+	if b {
+		// Warning: GitHub UX needs a single `\n` to turn it into a `<br>`.
+		return fmt.Sprintf("score is %d: %s:\n%s", score, check.Reason, s)
+	}
+	return fmt.Sprintf("score is %d: %s", score, check.Reason)
+}
+
 // AsSARIF outputs ScorecardResult in SARIF 2.1.0 format.
-func (r *ScorecardResult) AsSARIF(showDetails bool, logLevel zapcore.Level,
-	writer io.Writer, checkDocs docs.Doc, policy *spol.ScorecardPolicy,
-	policyFile string) error {
+func (r *ScorecardResult) AsSARIF(showDetails bool, logLevel log.Level,
+	writer io.Writer, checkDocs docs.Doc, policy *spol.ScorecardPolicy) error {
 	//nolint
 	// https://docs.oasis-open.org/sarif/sarif/v2.1.0/cs01/sarif-v2.1.0-cs01.html.
 	// We only support GitHub-supported properties:
@@ -508,11 +538,13 @@ func (r *ScorecardResult) AsSARIF(showDetails bool, logLevel zapcore.Level,
 			return sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("GetCheck: %v: %s", err, check.Name))
 		}
 
+		sarifCheckName, sarifCheckID := createCheckIdentifiers(check.Name)
+
 		// We need to create a run entry even if the check is disabled or the policy is satisfied.
 		// The reason is the following: if a check has findings and is later fixed by a user,
 		// the absence of run for the check will indicate that the check was *not* run,
 		// so GitHub would keep the findings in the dahsboard. We don't want that.
-		category, err := computeCategory(doc.GetSupportedRepoTypes())
+		category, err := computeCategory(sarifCheckName, doc.GetSupportedRepoTypes())
 		if err != nil {
 			return sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("computeCategory: %v: %s", err, check.Name))
 		}
@@ -522,14 +554,15 @@ func (r *ScorecardResult) AsSARIF(showDetails bool, logLevel zapcore.Level,
 		// Always add rules to indicate which checks were run.
 		// We don't have so many rules, so this should not clobber the output too much.
 		// See https://github.com/github/codeql-action/issues/810.
-		checkID := check.Name
-		rule := createSARIFRule(check.Name, checkID,
+		rule := createSARIFRule(sarifCheckName, sarifCheckID,
 			doc.GetDocumentationURL(r.Scorecard.CommitSHA),
 			doc.GetDescription(), doc.GetShort(), doc.GetRisk(),
 			doc.GetRemediation(), doc.GetTags())
 		run.Tool.Driver.Rules = append(run.Tool.Driver.Rules, rule)
 
 		// Check the policy configuration.
+		// Here we need to use check.Name instead of sarifCheckName since
+		// we need to original check's name.
 		minScore, enabled, err := getCheckPolicyInfo(policy, check.Name)
 		if err != nil {
 			return err
@@ -539,7 +572,7 @@ func (r *ScorecardResult) AsSARIF(showDetails bool, logLevel zapcore.Level,
 		}
 
 		// Skip check that do not violate the policy.
-		if check.Score >= minScore {
+		if check.Score >= minScore || check.Score == checker.InconclusiveResultScore {
 			continue
 		}
 
@@ -561,14 +594,16 @@ func (r *ScorecardResult) AsSARIF(showDetails bool, logLevel zapcore.Level,
 		// so it's the last position for us.
 		RuleIndex := len(run.Tool.Driver.Rules) - 1
 		if len(locs) == 0 {
-			locs = addDefaultLocation(locs, policyFile)
-			// Use the `reason` as message.
-			cr := createSARIFCheckResult(RuleIndex, checkID, check.Reason, &locs[0])
+			// Note: this is not a valid URI but GitHub still accepts it.
+			// See https://sarifweb.azurewebsites.net/Validation to test verification.
+			locs = addDefaultLocation(locs, "no file associated with this alert")
+			msg := createDefaultLocationMessage(&check, check.Score)
+			cr := createSARIFCheckResult(RuleIndex, sarifCheckID, msg, &locs[0])
 			run.Results = append(run.Results, cr)
 		} else {
 			for _, loc := range locs {
 				// Use the location's message (check's detail's message) as message.
-				cr := createSARIFCheckResult(RuleIndex, checkID, loc.Message.Text, &loc)
+				cr := createSARIFCheckResult(RuleIndex, sarifCheckID, loc.Message.Text, &loc)
 				run.Results = append(run.Results, cr)
 			}
 		}

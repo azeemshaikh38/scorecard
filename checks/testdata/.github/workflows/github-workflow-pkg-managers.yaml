@@ -43,17 +43,23 @@ jobs:
       - name:
         run: npm i -g typescript
       - name:
-        run: go get github.com@some_tag
+        run: npm ci
       - name:
-        run: go install github.com@some_tag
+        run: |
+          npm install-test
+          npm install-ci-test
       - name:
-        run: go install github.com@some_tag
+        run: go get github.com/org/name@some_tag
       - name:
-        run: go get github.com@some_tag
+        run: go install github.com/org/name@some_tag
       - name:
-        run: go get github.com@1111111111ccccccccccaaaaaaaaaa9999999999
+        run: go install github.com/org/name@some_tag
       - name:
-        run: go get github.com@1111111111ccccccccccaaaaaaaaaa9999999999
+        run: go get github.com/org/name@some_tag
+      - name:
+        run: go get github.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999
+      - name:
+        run: go get github.com/org/name@1111111111ccccccccccaaaaaaaaaa9999999999
       - name:
         run: go mod download
       - name:
@@ -90,3 +96,5 @@ jobs:
         run: python -m pip install 'some-pkg==1.2.3'
       - name:
         run: python -m pip install 'some-pkg>1.2.3'
+      - name:
+        run: pip3 install -r bla-requirements.txt --require-hashes && pip3 install --require-hashes -r bla-requirements.txt

@@ -17,10 +17,10 @@ package checks
 import (
 	"fmt"
 
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/checks/fileparser"
-	"github.com/ossf/scorecard/v3/clients"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/checks/fileparser"
+	"github.com/ossf/scorecard/v4/clients"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
 // CheckFuzzing is the registered name for Fuzzing.
@@ -28,16 +28,21 @@ const CheckFuzzing = "Fuzzing"
 
 //nolint:gochecknoinits
 func init() {
-	registerCheck(CheckFuzzing, Fuzzing)
+	if err := registerCheck(CheckFuzzing, Fuzzing, nil); err != nil {
+		// this should never happen
+		panic(err)
+	}
 }
 
 func checkCFLite(c *checker.CheckRequest) (bool, error) {
 	result := false
-	e := fileparser.CheckFilesContent(".clusterfuzzlite/Dockerfile", true, c,
-		func(path string, content []byte, dl checker.DetailLogger, data fileparser.FileCbData) (bool, error) {
-			result = fileparser.CheckFileContainsCommands(content, "#")
-			return false, nil
-		}, nil)
+	e := fileparser.OnMatchingFileContentDo(c.RepoClient, fileparser.PathMatcher{
+		Pattern:       ".clusterfuzzlite/Dockerfile",
+		CaseSensitive: true,
+	}, func(path string, content []byte, args ...interface{}) (bool, error) {
+		result = fileparser.CheckFileContainsCommands(content, "#")
+		return false, nil
+	}, nil)
 	if e != nil {
 		return result, fmt.Errorf("%w", e)
 	}

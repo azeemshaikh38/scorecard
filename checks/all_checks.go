@@ -15,11 +15,23 @@
 // Package checks defines all Scorecard checks.
 package checks
 
-import "github.com/ossf/scorecard/v3/checker"
+import (
+	"github.com/ossf/scorecard/v4/checker"
+)
 
 // AllChecks is the list of all security checks that will be run.
 var AllChecks = checker.CheckNameToFnMap{}
 
-func registerCheck(name string, fn checker.CheckFn) {
-	AllChecks[name] = fn
+func registerCheck(name string, fn checker.CheckFn, supportedRequestTypes []checker.RequestType) error {
+	if name == "" {
+		return errInternalNameCannotBeEmpty
+	}
+	if fn == nil {
+		return errInternalCheckFuncCannotBeNil
+	}
+	AllChecks[name] = checker.Check{
+		Fn:                    fn,
+		SupportedRequestTypes: supportedRequestTypes,
+	}
+	return nil
 }

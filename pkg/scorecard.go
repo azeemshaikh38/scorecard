@@ -22,21 +22,24 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ossf/scorecard/v3/checker"
-	"github.com/ossf/scorecard/v3/clients"
-	sce "github.com/ossf/scorecard/v3/errors"
+	"github.com/ossf/scorecard/v4/checker"
+	"github.com/ossf/scorecard/v4/clients"
+	sce "github.com/ossf/scorecard/v4/errors"
 )
 
 func runEnabledChecks(ctx context.Context,
-	repo clients.Repo, checksToRun checker.CheckNameToFnMap,
+	repo clients.Repo, raw *checker.RawResults, checksToRun checker.CheckNameToFnMap,
 	repoClient clients.RepoClient, ossFuzzRepoClient clients.RepoClient, ciiClient clients.CIIBestPracticesClient,
+	vulnsClient clients.VulnerabilitiesClient,
 	resultsCh chan checker.CheckResult) {
 	request := checker.CheckRequest{
-		Ctx:         ctx,
-		RepoClient:  repoClient,
-		OssFuzzRepo: ossFuzzRepoClient,
-		CIIClient:   ciiClient,
-		Repo:        repo,
+		Ctx:                   ctx,
+		RepoClient:            repoClient,
+		OssFuzzRepo:           ossFuzzRepoClient,
+		CIIClient:             ciiClient,
+		VulnerabilitiesClient: vulnsClient,
+		Repo:                  repo,
+		RawResults:            raw,
 	}
 	wg := sync.WaitGroup{}
 	for checkName, checkFn := range checksToRun {
@@ -73,11 +76,14 @@ func getRepoCommitHash(r clients.RepoClient) (string, error) {
 // RunScorecards runs enabled Scorecard checks on a Repo.
 func RunScorecards(ctx context.Context,
 	repo clients.Repo,
+	commitSHA string,
+	raw bool,
 	checksToRun checker.CheckNameToFnMap,
 	repoClient clients.RepoClient,
 	ossFuzzRepoClient clients.RepoClient,
-	ciiClient clients.CIIBestPracticesClient) (ScorecardResult, error) {
-	if err := repoClient.InitRepo(repo); err != nil {
+	ciiClient clients.CIIBestPracticesClient,
+	vulnsClient clients.VulnerabilitiesClient) (ScorecardResult, error) {
+	if err := repoClient.InitRepo(repo, commitSHA); err != nil {
 		// No need to call sce.WithMessage() since InitRepo will do that for us.
 		//nolint:wrapcheck
 		return ScorecardResult{}, err
@@ -101,7 +107,14 @@ func RunScorecards(ctx context.Context,
 		Date: time.Now(),
 	}
 	resultsCh := make(chan checker.CheckResult)
-	go runEnabledChecks(ctx, repo, checksToRun, repoClient, ossFuzzRepoClient, ciiClient, resultsCh)
+	if raw {
+		go runEnabledChecks(ctx, repo, &ret.RawResults, checksToRun, repoClient, ossFuzzRepoClient,
+			ciiClient, vulnsClient, resultsCh)
+	} else {
+		go runEnabledChecks(ctx, repo, nil, checksToRun, repoClient, ossFuzzRepoClient,
+			ciiClient, vulnsClient, resultsCh)
+	}
+
 	for result := range resultsCh {
 		ret.Checks = append(ret.Checks, result)
 	}

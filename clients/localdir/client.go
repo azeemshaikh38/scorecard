@@ -27,16 +27,15 @@ import (
 	"strings"
 	"sync"
 
-	"go.uber.org/zap"
-
-	clients "github.com/ossf/scorecard/v3/clients"
+	clients "github.com/ossf/scorecard/v4/clients"
+	"github.com/ossf/scorecard/v4/log"
 )
 
 var errInputRepoType = errors.New("input repo should be of type repoLocal")
 
 //nolint:govet
 type localDirClient struct {
-	logger   *zap.Logger
+	logger   *log.Logger
 	ctx      context.Context
 	path     string
 	once     sync.Once
@@ -45,7 +44,7 @@ type localDirClient struct {
 }
 
 // InitRepo sets up the local repo.
-func (client *localDirClient) InitRepo(inputRepo clients.Repo) error {
+func (client *localDirClient) InitRepo(inputRepo clients.Repo, commitSHA string) error {
 	localRepo, ok := inputRepo.(*repoLocal)
 	if !ok {
 		return fmt.Errorf("%w: %v", errInputRepoType, inputRepo)
@@ -154,11 +153,6 @@ func (client *localDirClient) GetFileContent(filename string) ([]byte, error) {
 	return getFileContent(client.path, filename)
 }
 
-// ListMergedPRs implements RepoClient.ListMergedPRs.
-func (client *localDirClient) ListMergedPRs() ([]clients.PullRequest, error) {
-	return nil, fmt.Errorf("ListMergedPRs: %w", clients.ErrUnsupportedFeature)
-}
-
 // ListBranches implements RepoClient.ListBranches.
 func (client *localDirClient) ListBranches() ([]*clients.BranchRef, error) {
 	return nil, fmt.Errorf("ListBranches: %w", clients.ErrUnsupportedFeature)
@@ -214,7 +208,7 @@ func (client *localDirClient) Close() error {
 }
 
 // CreateLocalDirClient returns a client which implements RepoClient interface.
-func CreateLocalDirClient(ctx context.Context, logger *zap.Logger) clients.RepoClient {
+func CreateLocalDirClient(ctx context.Context, logger *log.Logger) clients.RepoClient {
 	return &localDirClient{
 		ctx:    ctx,
 		logger: logger,

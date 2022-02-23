@@ -23,7 +23,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	clients "github.com/ossf/scorecard/v3/clients"
+	clients "github.com/ossf/scorecard/v4/clients"
 )
 
 // MockRepoClient is a mock of RepoClient interface.
@@ -94,17 +94,17 @@ func (mr *MockRepoClientMockRecorder) GetFileContent(filename interface{}) *gomo
 }
 
 // InitRepo mocks base method.
-func (m *MockRepoClient) InitRepo(repo clients.Repo) error {
+func (m *MockRepoClient) InitRepo(repo clients.Repo, commitSHA string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InitRepo", repo)
+	ret := m.ctrl.Call(m, "InitRepo", repo, commitSHA)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // InitRepo indicates an expected call of InitRepo.
-func (mr *MockRepoClientMockRecorder) InitRepo(repo interface{}) *gomock.Call {
+func (mr *MockRepoClientMockRecorder) InitRepo(repo, commitSHA interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitRepo", reflect.TypeOf((*MockRepoClient)(nil).InitRepo), repo)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitRepo", reflect.TypeOf((*MockRepoClient)(nil).InitRepo), repo, commitSHA)
 }
 
 // IsArchived mocks base method.
@@ -210,21 +210,6 @@ func (m *MockRepoClient) ListIssues() ([]clients.Issue, error) {
 func (mr *MockRepoClientMockRecorder) ListIssues() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListIssues", reflect.TypeOf((*MockRepoClient)(nil).ListIssues))
-}
-
-// ListMergedPRs mocks base method.
-func (m *MockRepoClient) ListMergedPRs() ([]clients.PullRequest, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListMergedPRs")
-	ret0, _ := ret[0].([]clients.PullRequest)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListMergedPRs indicates an expected call of ListMergedPRs.
-func (mr *MockRepoClientMockRecorder) ListMergedPRs() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMergedPRs", reflect.TypeOf((*MockRepoClient)(nil).ListMergedPRs))
 }
 
 // ListReleases mocks base method.

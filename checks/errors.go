@@ -18,15 +18,12 @@ import (
 	"errors"
 )
 
-//nolint
 var (
-	errInternalInvalidDockerFile = errors.New("invalid Dockerfile")
-	errInternalInvalidYamlFile   = errors.New("invalid yaml file")
-	errInternalFilenameMatch     = errors.New("filename match error")
-	errInternalEmptyFile         = errors.New("empty file")
-	errInternalCommitishNil      = errors.New("commitish is nil")
-	errInternalBranchNotFound    = errors.New("branch not found")
-	errInvalidGitHubWorkflow     = errors.New("invalid GitHub workflow")
-	errInternalNoReviews         = errors.New("no reviews found")
-	errInternalNoCommits         = errors.New("no commits found")
+	errInternalInvalidDockerFile    = errors.New("invalid Dockerfile")
+	errInvalidGitHubWorkflow        = errors.New("invalid GitHub workflow")
+	errInternalNameCannotBeEmpty    = errors.New("name cannot be empty")
+	errInternalCheckFuncCannotBeNil = errors.New("checkFunc cannot be nil")
+	// TODO(#1245): these should be moved under `raw` package after migration.
+	errInvalidArgType   = errors.New("invalid arg type")
+	errInvalidArgLength = errors.New("invalid arg length")
 )

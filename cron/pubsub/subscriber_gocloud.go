@@ -20,11 +20,10 @@ import (
 	"log"
 
 	"gocloud.dev/pubsub"
-
 	// Needed to link in GCP drivers.
 	_ "gocloud.dev/pubsub/gcppubsub"
 
-	"github.com/ossf/scorecard/v3/cron/data"
+	"github.com/ossf/scorecard/v4/cron/data"
 )
 
 type receiver interface {
