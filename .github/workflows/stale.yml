@@ -26,7 +26,12 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/stale@7fb802b3079a276cf3c7e6ba9aa003c665b3f838 # v3.0.18
+    - name: Harden Runner
+      uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+      with:
+        egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+    - uses: actions/stale@3cc123766321e9f15a6676375c154ccffb12a358 # v3.0.18
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         stale-issue-message: 'Stale issue message'
@@ -38,4 +43,3 @@ jobs:
         days-before-pr-stale: '10'
         days-before-pr-close: '20'
         days-before-issue-stale: '60'
-

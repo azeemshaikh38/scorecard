@@ -13,6 +13,10 @@
 # limitations under the License.
 
 name: build
+
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -20,6 +24,11 @@ on:
   pull_request:
     branches:
     - main
+
+env:
+  PROTOC_VERSION: 3.17.3
+  GO_VERSION: 1.17.7
+
 jobs:
   unit-test:
     name: unit-test
@@ -27,9 +36,14 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -40,17 +54,17 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: Run unit-tests
        run: make unit-test
      - name: Upload codecoverage
-       uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b # 2.1.0
+       uses: codecov/codecov-action@81cd2dc8148241f03f5839d295e000b8f761e378 # 2.1.0
        with:
          files: ./unit-coverage.out
          verbose: true
@@ -60,13 +74,19 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -77,15 +97,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: generate mocks
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make install
             make generate-mocks
@@ -95,13 +120,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -112,15 +142,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }} 
      - name: generate docs
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make generate-docs
   build-proto:
@@ -129,13 +164,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -146,15 +186,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build-proto
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-proto
   build-scorecard:
@@ -164,13 +209,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -181,15 +231,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: Run build
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-scorecard
   build-controller:
@@ -199,13 +254,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -216,15 +276,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build cron
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-controller
   build-worker:
@@ -234,13 +299,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -251,15 +321,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build worker
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-worker
   build-cii-worker:
@@ -269,13 +344,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -286,15 +366,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build cii-worker
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-cii-worker
   build-shuffler:
@@ -304,13 +389,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -321,15 +411,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build shuffler
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-shuffler
   build-bq-transfer:
@@ -339,13 +434,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -356,15 +456,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build bq transfer
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-bq-transfer
   build-github-server:
@@ -374,13 +479,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -391,15 +501,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build bq transfer
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-github-server
   build-webhook:
@@ -409,13 +524,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -426,15 +546,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build webhook
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-webhook
   build-add-script:
@@ -444,13 +569,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -461,15 +591,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build-add-script
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-add-script
   build-validate-script:
@@ -479,13 +614,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -496,15 +636,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build-validate-script
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-validate-script
   build-update-script:
@@ -514,13 +659,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -531,15 +681,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: build-validate-script
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make build-update-script
   check-linter:
@@ -548,13 +703,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Install Protoc
        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
        with:
-        version: 3.17.3
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -565,13 +725,13 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: Run build
        run: |
             go env -w GOFLAGS=-mod=mod
@@ -582,9 +742,14 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -595,26 +760,40 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: Run build
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make validate-docs
   add-projects:
     name: add-projects
     runs-on: ubuntu-latest
+    needs: build-proto
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+     - name: Install Protoc
+       uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
+       with:
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -625,15 +804,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: Run build
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make add-projects
   validate-projects:
@@ -642,9 +826,18 @@ jobs:
     permissions:
       contents: read
     steps:
+     - name: Harden Runner
+       uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+       with:
+         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+     - name: Install Protoc
+       uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
+       with:
+        version: ${{ env.PROTOC_VERSION }}
      - name: Cache builds
        # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-       uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+       uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
        with:
          path: |
            ~/go/pkg/mod
@@ -655,15 +848,20 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+       uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
-       uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+       uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
        with:
-         go-version: '^1.17'
+         go-version: ${{ env.GO_VERSION }}
      - name: Run build
-       run: |
+       uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c
+       with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: |
             go env -w GOFLAGS=-mod=mod
             make validate-projects
   license-check:
@@ -672,13 +870,18 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
-      - uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+      - name: Harden Runner
+        uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+        with:
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
+      - uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
         with:
           go-version: '1.17'
       - name: Check license headers
         run: |
           go env -w GOFLAGS=-mod=mod
           go install github.com/google/addlicense@2fe3ee94479d08be985a84861de4e6b06a1c7208
-          addlicense -ignore "**/script-empty.sh" -ignore "pkg/testdata/**" -ignore "checks/testdata/**" -l apache -c 'Security Scorecard Authors' -v *
+          addlicense -ignore "**/script-empty.sh" -ignore "testdata/**" -ignore "**/testdata/**" -l apache -c 'Security Scorecard Authors' -v *
           git diff --exit-code

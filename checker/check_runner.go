@@ -36,6 +36,30 @@ type Runner struct {
 	CheckRequest CheckRequest
 }
 
+// NewRunner creates a new instance of `Runner`.
+func NewRunner(checkName, repo string, checkReq *CheckRequest) *Runner {
+	return &Runner{
+		CheckName:    checkName,
+		Repo:         repo,
+		CheckRequest: *checkReq,
+	}
+}
+
+// SetCheckName sets the check name.
+func (r *Runner) SetCheckName(check string) {
+	r.CheckName = check
+}
+
+// SetRepo sets the repository.
+func (r *Runner) SetRepo(repo string) {
+	r.Repo = repo
+}
+
+// SetCheckRequest sets the check request.
+func (r *Runner) SetCheckRequest(checkReq *CheckRequest) {
+	r.CheckRequest = *checkReq
+}
+
 // CheckFn defined for convenience.
 type CheckFn func(*CheckRequest) CheckResult
 
@@ -53,7 +77,7 @@ func logStats(ctx context.Context, startTime time.Time, result *CheckResult) err
 	opencensusstats.Record(ctx, stats.CheckRuntimeInSec.M(runTimeInSecs))
 
 	if result.Error != nil {
-		ctx, err := tag.New(ctx, tag.Upsert(stats.ErrorName, sce.GetName(result.Error2)))
+		ctx, err := tag.New(ctx, tag.Upsert(stats.ErrorName, sce.GetName(result.Error)))
 		if err != nil {
 			return sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("tag.New: %v", err))
 		}
@@ -79,16 +103,15 @@ func (r *Runner) Run(ctx context.Context, c Check) CheckResult {
 	startTime := time.Now()
 
 	var res CheckResult
-	var l logger
+	l := NewLogger()
 	for retriesRemaining := checkRetries; retriesRemaining > 0; retriesRemaining-- {
 		checkRequest := r.CheckRequest
 		checkRequest.Ctx = ctx
-		l = logger{}
-		checkRequest.Dlogger = &l
+		checkRequest.Dlogger = l
 		res = c.Fn(&checkRequest)
-		if res.Error2 != nil && errors.Is(res.Error2, sce.ErrRepoUnreachable) {
+		if res.Error != nil && errors.Is(res.Error, sce.ErrRepoUnreachable) {
 			checkRequest.Dlogger.Warn(&LogMessage{
-				Text: fmt.Sprintf("%v", res.Error2),
+				Text: fmt.Sprintf("%v", res.Error),
 			})
 			continue
 		}
@@ -97,10 +120,7 @@ func (r *Runner) Run(ctx context.Context, c Check) CheckResult {
 
 	// Set details.
 	// TODO(#1393): Remove.
-	res.Details2 = l.Flush()
-	for _, d := range res.Details2 {
-		res.Details = append(res.Details, d.Msg.Text)
-	}
+	res.Details = l.Flush()
 
 	if err := logStats(ctx, startTime, &res); err != nil {
 		panic(err)

@@ -264,8 +264,8 @@ logging github context and secrets, or use of potentially untrusted inputs in sc
 The following patterns are checked:
 
 Untrusted Code Checkout: This is the misuse of potentially dangerous triggers. 
-This checks if a `pull_request_target` workflow trigger was used in conjunction 
-with an explicit pull request checkout. Workflows triggered with `pull_request_target`
+This checks if a `pull_request_target` or `workflow_run` workflow trigger was used in conjunction 
+with an explicit pull request checkout. Workflows triggered with `pull_request_target` / `workflow_run`
 have write permission to the target repository and access to target repository 
 secrets. With the PR checkout, PR authors may compromise the repository, for 
 example, by using build scripts controlled by the author of the PR or reading 
@@ -317,9 +317,10 @@ low score is therefore not a definitive indication that the project is at risk.
 Risk: `Medium` (possible vulnerabilities in code)
 
 This check tries to determine if the project uses
-[fuzzing](https://owasp.org/www-community/Fuzzing) by checking if the repository
-name is included in the [OSS-Fuzz](https://github.com/google/oss-fuzz) project
-list.
+[fuzzing](https://owasp.org/www-community/Fuzzing) by checking:
+1. if the repository name is included in the [OSS-Fuzz](https://github.com/google/oss-fuzz) project list;
+2. if [ClusterFuzzLite](https://google.github.io/clusterfuzzlite/) is deployed in the repository;
+3. if there are user-defined language-specified fuzzing functions (currently only supports [Go fuzzing](https://go.dev/doc/fuzz/)) in the repository.
 
 Fuzzing, or fuzz testing, is the practice of feeding unexpected or random data
 into a program to expose bugs. Regular fuzzing is important to detect
@@ -469,7 +470,7 @@ dependencies using the [GitHub dependency graph](https://docs.github.com/en/code
 - First determine if your project is producing a library or application. If it is a library, you generally don't want to pin dependencies of library users, and should not follow any remediation steps.
 - If your project is producing an application, declare all your dependencies with specific versions in your package format file (e.g. `package.json` for npm, `requirements.txt` for python). For C/C++, check in the code from a trusted source and add a `README` on the specific version used (and the archive SHA hashes).
 - If the package manager supports lock files (e.g. `package-lock.json` for npm), make sure to check these in the source code as well. These files maintain signatures for the entire dependency tree and saves from future exploitation in case the package is compromised.
-- For Dockerfiles, pin dependencies by hash. See [Dockerfile](https://github.com/ossf/scorecard/blob/main/cron/worker/Dockerfile) for example. 
+- For Dockerfiles, pin dependencies by hash. See [Dockerfile](https://github.com/ossf/scorecard/blob/main/cron/internal/worker/Dockerfile) for example. If you are using a manifest list to support builds across multiple architectures, you can pin to the manifest list hash instead of a single image hash. You can use a tool like [crane](https://github.com/google/go-containerregistry/blob/main/cmd/crane/README.md)  to obtain the hash of the manifest list like in this [example](https://github.com/ossf/scorecard/issues/1773#issuecomment-1076699039).
 - For GitHub workflows, pin dependencies by hash. See [main.yaml](https://github.com/ossf/scorecard/blob/f55b86d6627cc3717e3a0395e03305e81b9a09be/.github/workflows/main.yml#L27) for example. To determine the permissions needed for your workflows, you may use [StepSecurity's online tool](https://app.stepsecurity.io/) by ticking the "Pin actions to a full length commit SHA". You may also tick the "Restrict permissions for GITHUB_TOKEN" to fix issues found by the Token-Permissions check.
 - To help update your dependencies after pinning them, use tools such as
  Github's [dependabot](https://github.blog/2020-06-01-keep-all-your-packages-up-to-date-with-dependabot/)
@@ -566,9 +567,22 @@ and the required write permissions are declared at the
 One point is reduced from the score if all jobs have their permissions defined but the top level permissions are not defined. 
 This configuration is secure, but there is a chance that when a new job is added to the workflow, its job permissions could be 
 left undefined because of human error.
-        
+
 The check cannot detect if the "read-only" GitHub permission setting is
-enabled, as there is no API available.   
+enabled, as there is no API available.
+
+Additionally, points are reduced if certain write permissions are defined for a job. 
+
+### Write permissions causing a small reduction
+* `statuses` - May allow an attacker to change the result of pre-submit checks and get a PR merged.
+* `checks` - May allow an attacker to remove pre-submit checks and introduce a bug.
+* `security-events` - May allow an attacker to read vulnerability reports before a patch is available. However, points are not reduced if the job utilizes a recognized action for uploading SARIF results.
+* `deployments` - May allow an attacker to charge repo owner by triggering VM runs, and tiny chance an attacker can trigger a remote service with code they own if server accepts code/location variables unsanitized.
+
+### Write permissions causing a large reduction
+* `contents` - Allows an attacker to commit unreviewed code. However, points are not reduced if the job utilizes a recognized packaging action or command.
+* `packages` - Allows an attacker to publish packages. However, points are not reduced if the job utilizes a recognized packaging action or command.
+* `actions` - May allow an attacker to steal GitHub secrets by approving to run an action that needs approval.
  
 
 **Remediation steps**
@@ -587,4 +601,16 @@ possible.
 
 **Remediation steps**
 - Fix the vulnerabilities. The details of each vulnerability can be found on <https://osv.dev>.
+
+## Webhooks 
+
+Risk: `Critical` (service possibly accessible to third parties)
+
+This check determines whether the webhook defined in the repository has a token configured to authenticate the origins of requests.
+ 
+
+**Remediation steps**
+- Check whether your service supports token authentication.
+- If there is support for token authentication, set the secret in the webhook configuration. See [Setting up a webhook](https://docs.github.com/en/developers/webhooks-and-events/webhooks/creating-webhooks#setting-up-a-webhook)
+- If there is no support for token authentication, consider implementing it by following [these directions](https://docs.github.com/en/developers/webhooks-and-events/webhooks/securing-your-webhooks).
 

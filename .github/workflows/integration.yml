@@ -24,6 +24,11 @@ jobs:
   approve:
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+        with:
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: approve
         run: echo For security reasons, all pull requests need to be approved before running integration tests.
 
@@ -32,19 +37,24 @@ jobs:
     environment: integration-test
     needs: [approve]
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+        with:
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: pull_request actions/checkout
-        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v2.3.4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: setup-go
-        uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2.2.0
+        uses: actions/setup-go@84cbf8094393cdc5fe1fe1671ff2647332956b1a # v2.2.0
         with:
           go-version: '1.17'
 
       - name: Cache builds
         # https://github.com/mvdan/github-actions-golang#how-do-i-set-up-caching-between-builds
-        uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed #v2.1.7
+        uses: actions/cache@c3f1317a9e7b1ef106c153ac8c0f00fed3ddbc0d #v2.1.7
         with:
           # In order:
           # * Module download cache
@@ -64,7 +74,17 @@ jobs:
         run: |
             go mod download
 
-      - name: Run E2E  #using retry because the GitHub token is being throttled. 
+      - name: Run GITHUB_TOKEN E2E  #using retry because the GitHub token is being throttled. 
+        uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c 
+        env:
+          GITHUB_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          max_attempts: 3
+          retry_on: error
+          timeout_minutes: 30
+          command: make e2e-gh-token
+
+      - name: Run PAT E2E  #using retry because the GitHub token is being throttled. 
         uses: nick-invision/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c 
         env:
           GITHUB_AUTH_TOKEN: ${{ secrets.GH_AUTH_TOKEN }}
@@ -72,16 +92,16 @@ jobs:
           max_attempts: 3
           retry_on: error
           timeout_minutes: 30
-          command: make e2e
+          command: make e2e-pat
 
       - name: codecov
-        uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b # 2.1.0
+        uses: codecov/codecov-action@81cd2dc8148241f03f5839d295e000b8f761e378 # 2.1.0
         with:
          files: ./e2e-coverage.out
          verbose: true
 
       - name: find comment
-        uses: peter-evans/find-comment@d2dae40ed151c634e4189471272b57e76ec19ba8 # v1.2.0
+        uses: peter-evans/find-comment@1769778a0c5bd330272d749d12c036d65e70d39d # v1.2.0
         id: fc
         with:
           issue-number: ${{ github.event.pull_request.number || github.event.client_payload.pull_request.number }}
@@ -89,7 +109,7 @@ jobs:
           body-includes: Integration tests ran for
 
       - name: create or update comment
-        uses: peter-evans/create-or-update-comment@a35cf36e5301d70b76f316e867e7788a55a31dae # v1.4.5
+        uses: peter-evans/create-or-update-comment@c9fcb64660bc90ec1cc535646af190c992007c32 # v1.4.5
         with:
           issue-number: ${{ github.event.pull_request.number || github.event.client_payload.pull_request.number }}
           comment-id: ${{ steps.fc.outputs.comment-id }}

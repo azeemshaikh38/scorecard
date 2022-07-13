@@ -64,7 +64,8 @@ type location struct {
 	PhysicalLocation physicalLocation `json:"physicalLocation"`
 	//nolint
 	// This is optional https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/sarif-support-for-code-scanning#location-object.
-	Message *text `json:"message,omitempty"`
+	Message        *text `json:"message,omitempty"`
+	HasRemediation bool  `json:"-"`
 }
 
 //nolint
@@ -252,7 +253,8 @@ func detailToRegion(details *checker.CheckDetail) region {
 }
 
 func shouldAddLocation(detail *checker.CheckDetail, showDetails bool,
-	minScore, score int) bool {
+	minScore, score int,
+) bool {
 	switch {
 	default:
 		return false
@@ -269,7 +271,8 @@ func shouldAddLocation(detail *checker.CheckDetail, showDetails bool,
 }
 
 func detailsToLocations(details []checker.CheckDetail,
-	showDetails bool, minScore, score int) []location {
+	showDetails bool, minScore, score int,
+) []location {
 	locs := []location{}
 
 	//nolint
@@ -296,6 +299,12 @@ func detailsToLocations(details []checker.CheckDetail,
 				},
 			},
 			Message: &text{Text: d.Msg.Text},
+		}
+
+		// Add remediaiton information
+		if d.Msg.Remediation != nil {
+			loc.Message.Text = fmt.Sprintf("%s\nRemediation tip: %s", loc.Message.Text, d.Msg.Remediation.HelpMarkdown)
+			loc.HasRemediation = true
 		}
 
 		// Set the region depending on the file type.
@@ -355,7 +364,8 @@ func createSARIFTool(url, name, version string) tool {
 }
 
 func createSARIFRun(uri, toolName, version, commit string, t time.Time,
-	category, runName string) run {
+	category, runName string,
+) run {
 	return run{
 		Tool:    createSARIFTool(uri, toolName, version),
 		Results: []result{},
@@ -370,7 +380,8 @@ func createSARIFRun(uri, toolName, version, commit string, t time.Time,
 
 func getOrCreateSARIFRun(runs map[string]*run, runName string,
 	uri, toolName, version, commit string, t time.Time,
-	category string) *run {
+	category string,
+) *run {
 	if prun, exists := runs[runName]; exists {
 		return prun
 	}
@@ -399,7 +410,8 @@ func generateMarkdownText(longDesc, risk string, remediation []string) string {
 
 func createSARIFRule(checkName, checkID, descURL, longDesc, shortDesc, risk string,
 	remediation []string,
-	tags []string) rule {
+	tags []string,
+) rule {
 	return rule{
 		ID:        checkID,
 		Name:      checkName,
@@ -423,12 +435,17 @@ func createSARIFRule(checkName, checkID, descURL, longDesc, shortDesc, risk stri
 }
 
 func createSARIFCheckResult(pos int, checkID, message string, loc *location) result {
+	t := fmt.Sprintf("%s\nClick Remediation section below to solve this issue", message)
+	if loc.HasRemediation {
+		t = fmt.Sprintf("%s\nClick Remediation section below for further remediation help", message)
+	}
+
 	return result{
 		RuleID: checkID,
 		// https://github.com/microsoft/sarif-tutorials/blob/main/docs/2-Basics.md#level
 		// Level:     scoreToLevel(minScore, score),
 		RuleIndex: pos,
-		Message:   text{Text: fmt.Sprintf("%s\nClick Remediation section below to solve this issue", message)},
+		Message:   text{Text: t},
 		Locations: []location{*loc},
 	}
 }
@@ -510,19 +527,24 @@ func filterOutDetailType(details []checker.CheckDetail, t checker.DetailType) []
 	return ret
 }
 
+func messageWithScore(msg string, score int) string {
+	return fmt.Sprintf("score is %d: %s", score, msg)
+}
+
 func createDefaultLocationMessage(check *checker.CheckResult, score int) string {
-	details := filterOutDetailType(check.Details2, checker.DetailInfo)
+	details := filterOutDetailType(check.Details, checker.DetailInfo)
 	s, b := detailsToString(details, log.WarnLevel)
 	if b {
 		// Warning: GitHub UX needs a single `\n` to turn it into a `<br>`.
-		return fmt.Sprintf("score is %d: %s:\n%s", score, check.Reason, s)
+		return messageWithScore(fmt.Sprintf("%s:\n%s", check.Reason, s), score)
 	}
-	return fmt.Sprintf("score is %d: %s", score, check.Reason)
+	return messageWithScore(check.Reason, score)
 }
 
 // AsSARIF outputs ScorecardResult in SARIF 2.1.0 format.
 func (r *ScorecardResult) AsSARIF(showDetails bool, logLevel log.Level,
-	writer io.Writer, checkDocs docs.Doc, policy *spol.ScorecardPolicy) error {
+	writer io.Writer, checkDocs docs.Doc, policy *spol.ScorecardPolicy,
+) error {
 	//nolint
 	// https://docs.oasis-open.org/sarif/sarif/v2.1.0/cs01/sarif-v2.1.0-cs01.html.
 	// We only support GitHub-supported properties:
@@ -543,7 +565,7 @@ func (r *ScorecardResult) AsSARIF(showDetails bool, logLevel log.Level,
 		// We need to create a run entry even if the check is disabled or the policy is satisfied.
 		// The reason is the following: if a check has findings and is later fixed by a user,
 		// the absence of run for the check will indicate that the check was *not* run,
-		// so GitHub would keep the findings in the dahsboard. We don't want that.
+		// so GitHub would keep the findings in the dashboard. We don't want that.
 		category, err := computeCategory(sarifCheckName, doc.GetSupportedRepoTypes())
 		if err != nil {
 			return sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("computeCategory: %v: %s", err, check.Name))
@@ -586,7 +608,7 @@ func (r *ScorecardResult) AsSARIF(showDetails bool, logLevel log.Level,
 		// would change, and the result management system would erroneously report it as a new result."
 
 		// Create locations.
-		locs := detailsToLocations(check.Details2, showDetails, minScore, check.Score)
+		locs := detailsToLocations(check.Details, showDetails, minScore, check.Score)
 
 		// Add default location if no locations are present.
 		// Note: GitHub needs at least one location to show the results.
@@ -603,7 +625,8 @@ func (r *ScorecardResult) AsSARIF(showDetails bool, logLevel log.Level,
 		} else {
 			for _, loc := range locs {
 				// Use the location's message (check's detail's message) as message.
-				cr := createSARIFCheckResult(RuleIndex, sarifCheckID, loc.Message.Text, &loc)
+				msg := messageWithScore(loc.Message.Text, check.Score)
+				cr := createSARIFCheckResult(RuleIndex, sarifCheckID, msg, &loc)
 				run.Results = append(run.Results, cr)
 			}
 		}

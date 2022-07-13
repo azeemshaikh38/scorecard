@@ -15,8 +15,16 @@
 // Package main of OSSF Scoreard.
 package main
 
-import "github.com/ossf/scorecard/v4/cmd"
+import (
+	"log"
+
+	"github.com/ossf/scorecard/v4/cmd"
+	"github.com/ossf/scorecard/v4/options"
+)
 
 func main() {
-	cmd.Execute()
+	opts := options.New()
+	if err := cmd.New(opts).Execute(); err != nil {
+		log.Fatalf("error during command execution: %v", err)
+	}
 }

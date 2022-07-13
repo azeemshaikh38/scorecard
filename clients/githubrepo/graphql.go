@@ -58,6 +58,10 @@ type graphqlData struct {
 								Login *string
 							}
 						}
+						Signature struct {
+							IsValid           bool
+							WasSignedByGitHub bool
+						}
 						AssociatedPullRequests struct {
 							Nodes []struct {
 								Repository struct {
@@ -96,11 +100,17 @@ type graphqlData struct {
 				// nolint: revive,stylecheck // naming according to githubv4 convention.
 				Url               *string
 				AuthorAssociation *string
-				CreatedAt         *time.Time
-				Comments          struct {
+				Author            struct {
+					Login githubv4.String
+				}
+				CreatedAt *time.Time
+				Comments  struct {
 					Nodes []struct {
 						AuthorAssociation *string
 						CreatedAt         *time.Time
+						Author            struct {
+							Login githubv4.String
+						}
 					}
 				} `graphql:"comments(last: $issueCommentsToAnalyze)"`
 			}
@@ -191,15 +201,23 @@ func (handler *graphqlHandler) isArchived() (bool, error) {
 	return handler.archived, nil
 }
 
-// nolint: unparam
+//nolint
 func commitsFrom(data *graphqlData, repoOwner, repoName string) ([]clients.Commit, error) {
 	ret := make([]clients.Commit, 0)
 	for _, commit := range data.Repository.Object.Commit.History.Nodes {
 		var committer string
-		if commit.Committer.User.Login != nil {
+		// Find the commit's committer.
+		if commit.Committer.User.Login != nil && *commit.Committer.User.Login != "" {
 			committer = *commit.Committer.User.Login
+		} else if commit.Committer.Name != nil &&
+			// Username "GitHub" may indicate the commit was committed by GitHub.
+			// We verify that the commit is signed by GitHub, because the name can be spoofed.
+			*commit.Committer.Name == "GitHub" &&
+			commit.Signature.IsValid &&
+			commit.Signature.WasSignedByGitHub {
+			committer = "github"
 		}
-		// TODO(#1543): Figure out a way to safely get committer if `User.Login` is `nil`.
+
 		var associatedPR clients.PullRequest
 		for i := range commit.AssociatedPullRequests.Nodes {
 			pr := commit.AssociatedPullRequests.Nodes[i]
@@ -226,6 +244,9 @@ func commitsFrom(data *graphqlData, repoOwner, repoName string) ([]clients.Commi
 			for _, review := range pr.Reviews.Nodes {
 				associatedPR.Reviews = append(associatedPR.Reviews, clients.Review{
 					State: string(review.State),
+					Author: &clients.User{
+						Login: string(review.Author.Login),
+					},
 				})
 			}
 			break
@@ -250,10 +271,20 @@ func issuesFrom(data *graphqlData) []clients.Issue {
 		copyStringPtr(issue.Url, &tmpIssue.URI)
 		copyRepoAssociationPtr(getRepoAssociation(issue.AuthorAssociation), &tmpIssue.AuthorAssociation)
 		copyTimePtr(issue.CreatedAt, &tmpIssue.CreatedAt)
+		if issue.Author.Login != "" {
+			tmpIssue.Author = &clients.User{
+				Login: string(issue.Author.Login),
+			}
+		}
 		for _, comment := range issue.Comments.Nodes {
 			var tmpComment clients.IssueComment
 			copyRepoAssociationPtr(getRepoAssociation(comment.AuthorAssociation), &tmpComment.AuthorAssociation)
 			copyTimePtr(comment.CreatedAt, &tmpComment.CreatedAt)
+			if comment.Author.Login != "" {
+				tmpComment.Author = &clients.User{
+					Login: string(comment.Author.Login),
+				}
+			}
 			tmpIssue.Comments = append(tmpIssue.Comments, tmpComment)
 		}
 		ret = append(ret, tmpIssue)

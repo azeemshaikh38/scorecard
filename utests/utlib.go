@@ -100,8 +100,13 @@ func errCmp(e1, e2 error) bool {
 
 // ValidateTestReturn validates expected TestReturn with actual checker.CheckResult values.
 // nolint: thelper
-func ValidateTestReturn(t *testing.T, name string, expected *TestReturn,
-	actual *checker.CheckResult, logger *TestDetailLogger) bool {
+func ValidateTestReturn(
+	t *testing.T,
+	name string,
+	expected *TestReturn,
+	actual *checker.CheckResult,
+	logger *TestDetailLogger,
+) bool {
 	actualTestReturn, err := getTestReturn(actual, logger)
 	if err != nil {
 		panic(err)
@@ -113,9 +118,22 @@ func ValidateTestReturn(t *testing.T, name string, expected *TestReturn,
 	return true
 }
 
+// ValidatePinningDependencies tests that at least one entry returns true for isExpectedMessage.
+func ValidatePinningDependencies(isExpectedDependency func(checker.Dependency) bool,
+	r *checker.PinningDependenciesData,
+) bool {
+	for _, dep := range r.Dependencies {
+		if isExpectedDependency(dep) {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidateLogMessage tests that at least one log message returns true for isExpectedMessage.
 func ValidateLogMessage(isExpectedMessage func(checker.LogMessage, checker.DetailType) bool,
-	dl *TestDetailLogger) bool {
+	dl *TestDetailLogger,
+) bool {
 	for _, message := range dl.messages {
 		if isExpectedMessage(message.Msg, message.Type) {
 			return true

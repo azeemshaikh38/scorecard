@@ -39,15 +39,15 @@ func TestPolicyRead(t *testing.T) {
 			result: ScorecardPolicy{
 				Version: 1,
 				Policies: map[string]*CheckPolicy{
-					"Token-Permissions": &CheckPolicy{
+					"Token-Permissions": {
 						Score: 3,
 						Mode:  CheckPolicy_DISABLED,
 					},
-					"Branch-Protection": &CheckPolicy{
+					"Branch-Protection": {
 						Score: 5,
 						Mode:  CheckPolicy_ENFORCED,
 					},
-					"Vulnerabilities": &CheckPolicy{
+					"Vulnerabilities": {
 						Score: 1,
 						Mode:  CheckPolicy_ENFORCED,
 					},
@@ -61,15 +61,15 @@ func TestPolicyRead(t *testing.T) {
 			result: ScorecardPolicy{
 				Version: 1,
 				Policies: map[string]*CheckPolicy{
-					"Token-Permissions": &CheckPolicy{
+					"Token-Permissions": {
 						Score: 0,
 						Mode:  CheckPolicy_DISABLED,
 					},
-					"Branch-Protection": &CheckPolicy{
+					"Branch-Protection": {
 						Score: 5,
 						Mode:  CheckPolicy_ENFORCED,
 					},
-					"Vulnerabilities": &CheckPolicy{
+					"Vulnerabilities": {
 						Score: 1,
 						Mode:  CheckPolicy_ENFORCED,
 					},
@@ -114,7 +114,7 @@ func TestPolicyRead(t *testing.T) {
 				t.Fatalf("cannot read file: %v", err)
 			}
 
-			p, err := ParseFromYAML(content)
+			p, err := parseFromYAML(content)
 
 			if !errors.Is(err, tt.err) {
 				t.Fatalf("%s: expected %v, got %v", tt.name, tt.err, err)

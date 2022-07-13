@@ -15,7 +15,10 @@ package e2e
 
 import (
 	"context"
+	"io/ioutil"
+	"os"
 
+	"github.com/go-git/go-git/v5"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -23,6 +26,7 @@ import (
 	"github.com/ossf/scorecard/v4/checks"
 	"github.com/ossf/scorecard/v4/clients"
 	"github.com/ossf/scorecard/v4/clients/githubrepo"
+	"github.com/ossf/scorecard/v4/clients/localdir"
 	scut "github.com/ossf/scorecard/v4/utests"
 )
 
@@ -46,15 +50,34 @@ var _ = Describe("E2E TEST:"+checks.CheckTokenPermissions, func() {
 				Score:         checker.MinResultScore,
 				NumberOfWarn:  1,
 				NumberOfInfo:  2,
-				NumberOfDebug: 5,
+				NumberOfDebug: 6,
 			}
 			result := checks.TokenPermissions(&req)
-			// UPGRADEv2: to remove.
-			// Old version.
-
-			Expect(result.Error).Should(BeNil())
-			Expect(result.Pass).Should(BeFalse())
 			// New version.
+			Expect(scut.ValidateTestReturn(nil, "token permissions", &expected, &result, &dl)).Should(BeTrue())
+			Expect(repoClient.Close()).Should(BeNil())
+		})
+		It("Should return token permission works on empty repo", func() {
+			dl := scut.TestDetailLogger{}
+			repo, err := githubrepo.MakeGithubRepo("ossf-tests/scorecard-empty-repo")
+			Expect(err).Should(BeNil())
+			repoClient := githubrepo.CreateGithubRepoClient(context.Background(), logger)
+			err = repoClient.InitRepo(repo, clients.HeadSHA)
+			Expect(err).Should(BeNil())
+			req := checker.CheckRequest{
+				Ctx:        context.Background(),
+				RepoClient: repoClient,
+				Repo:       repo,
+				Dlogger:    &dl,
+			}
+			expected := scut.TestReturn{
+				Error:         nil,
+				Score:         checker.MaxResultScore,
+				NumberOfWarn:  0,
+				NumberOfInfo:  0,
+				NumberOfDebug: 0,
+			}
+			result := checks.TokenPermissions(&req)
 			Expect(scut.ValidateTestReturn(nil, "token permissions", &expected, &result, &dl)).Should(BeTrue())
 			Expect(repoClient.Close()).Should(BeNil())
 		})
@@ -76,17 +99,49 @@ var _ = Describe("E2E TEST:"+checks.CheckTokenPermissions, func() {
 				Score:         checker.MinResultScore,
 				NumberOfWarn:  1,
 				NumberOfInfo:  2,
-				NumberOfDebug: 5,
+				NumberOfDebug: 6,
 			}
 			result := checks.TokenPermissions(&req)
-			// UPGRADEv2: to remove.
-			// Old version.
-
-			Expect(result.Error).Should(BeNil())
-			Expect(result.Pass).Should(BeFalse())
 			// New version.
 			Expect(scut.ValidateTestReturn(nil, "token permissions", &expected, &result, &dl)).Should(BeTrue())
 			Expect(repoClient.Close()).Should(BeNil())
+		})
+		It("Should return token permission for a local repo client", func() {
+			dl := scut.TestDetailLogger{}
+
+			tmpDir, err := ioutil.TempDir("", "")
+			Expect(err).Should(BeNil())
+			defer os.RemoveAll(tmpDir)
+
+			_, e := git.PlainClone(tmpDir, false, &git.CloneOptions{
+				URL: "http://github.com/ossf-tests/scorecard-check-token-permissions-e2e",
+			})
+			Expect(e).Should(BeNil())
+
+			repo, err := localdir.MakeLocalDirRepo(tmpDir)
+			Expect(err).Should(BeNil())
+
+			x := localdir.CreateLocalDirClient(context.Background(), logger)
+			err = x.InitRepo(repo, clients.HeadSHA)
+			Expect(err).Should(BeNil())
+
+			req := checker.CheckRequest{
+				Ctx:        context.Background(),
+				RepoClient: x,
+				Repo:       repo,
+				Dlogger:    &dl,
+			}
+			expected := scut.TestReturn{
+				Error:         nil,
+				Score:         checker.MinResultScore,
+				NumberOfWarn:  1,
+				NumberOfInfo:  2,
+				NumberOfDebug: 6,
+			}
+			result := checks.TokenPermissions(&req)
+			// New version.
+			Expect(scut.ValidateTestReturn(nil, "token permissions", &expected, &result, &dl)).Should(BeTrue())
+			Expect(x.Close()).Should(BeNil())
 		})
 	})
 })

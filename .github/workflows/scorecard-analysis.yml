@@ -2,7 +2,8 @@ name: Scorecard analysis workflow
 on:
   push:
     # Only the default branch is supported.
-    branches: [main, master]
+    branches:
+    - main
   schedule:
     # Weekly on Saturdays.
     - cron:  '30 1 * * 6'
@@ -20,32 +21,37 @@ jobs:
       security-events: write
 
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@74b568e8591fbb3115c70f3436a0c6b0909a8504 # v1
+        with:
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: "Checkout code"
-        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
 
       - name: "Run analysis"
-        uses: ossf/scorecard-action@c1aec4ac820532bab364f02a81873c555a0ba3a1
+        uses: ossf/scorecard-action@5c8bc69dc88b65c66584e07611df79d3579b0377
         with:
           results_file: results.sarif
           results_format: sarif
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           # Scorecard team runs a weekly scan of public GitHub repos,
           # see https://github.com/ossf/scorecard#public-data.
-          # Setting `share_results: true` helps us scale by leveraging your workflow to
+          # Setting `publish_results: true` helps us scale by leveraging your workflow to
           # extract the results instead of relying on our own infrastructure to run scans.
           # And it's free for you!
-          share_results: true
+          publish_results: true
 
       # https://docs.github.com/en/actions/advanced-guides/storing-workflow-data-as-artifacts
       # Optional.
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v2
         with:
           name: SARIF file
           path: results.sarif
           retention-days: 5
 
       - name: "Upload SARIF results"
-        uses: github/codeql-action/upload-sarif@v1
+        uses: github/codeql-action/upload-sarif@f5d822707ee6e8fb81b04a5c0040b736da22e587 # v1
         with:
           sarif_file: results.sarif

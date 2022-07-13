@@ -23,9 +23,11 @@ import (
 	"github.com/olekukonko/tablewriter"
 
 	"github.com/ossf/scorecard/v4/checker"
-	docs "github.com/ossf/scorecard/v4/docs/checks"
+	"github.com/ossf/scorecard/v4/docs/checks"
 	sce "github.com/ossf/scorecard/v4/errors"
 	"github.com/ossf/scorecard/v4/log"
+	"github.com/ossf/scorecard/v4/options"
+	spol "github.com/ossf/scorecard/v4/policy"
 )
 
 // ScorecardInfo contains information about the scorecard code that was run.
@@ -41,6 +43,7 @@ type RepoInfo struct {
 }
 
 // ScorecardResult struct is returned on a successful Scorecard run.
+//nolint
 type ScorecardResult struct {
 	Repo       RepoInfo
 	Date       time.Time
@@ -58,7 +61,7 @@ func scoreToString(s float64) string {
 }
 
 // GetAggregateScore returns the aggregate score.
-func (r *ScorecardResult) GetAggregateScore(checkDocs docs.Doc) (float64, error) {
+func (r *ScorecardResult) GetAggregateScore(checkDocs checks.Doc) (float64, error) {
 	// TODO: calculate the score and make it a field
 	// of ScorecardResult
 	weights := map[string]float64{"Critical": 10, "High": 7.5, "Medium": 5, "Low": 2.5}
@@ -97,11 +100,48 @@ func (r *ScorecardResult) GetAggregateScore(checkDocs docs.Doc) (float64, error)
 	return score / total, nil
 }
 
+// FormatResults formats scorecard results.
+func FormatResults(
+	opts *options.Options,
+	results *ScorecardResult,
+	doc checks.Doc,
+	policy *spol.ScorecardPolicy,
+) error {
+	var err error
+
+	switch opts.Format {
+	case options.FormatDefault:
+		err = results.AsString(opts.ShowDetails, log.ParseLevel(opts.LogLevel), doc, os.Stdout)
+	case options.FormatSarif:
+		// TODO: support config files and update checker.MaxResultScore.
+		err = results.AsSARIF(opts.ShowDetails, log.ParseLevel(opts.LogLevel), os.Stdout, doc, policy)
+	case options.FormatJSON:
+		err = results.AsJSON2(opts.ShowDetails, log.ParseLevel(opts.LogLevel), doc, os.Stdout)
+	case options.FormatRaw:
+		err = results.AsRawJSON(os.Stdout)
+	default:
+		err = sce.WithMessage(
+			sce.ErrScorecardInternal,
+			fmt.Sprintf(
+				"invalid format flag: %v. Expected [default, json]",
+				opts.Format,
+			),
+		)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to output results: %w", err)
+	}
+
+	return nil
+}
+
 // AsString returns ScorecardResult in string format.
 func (r *ScorecardResult) AsString(showDetails bool, logLevel log.Level,
-	checkDocs docs.Doc, writer io.Writer) error {
+	checkDocs checks.Doc, writer io.Writer,
+) error {
 	data := make([][]string, len(r.Checks))
-	//nolint
+
 	for i, row := range r.Checks {
 		const withdetails = 5
 		const withoutdetails = 4
@@ -129,7 +169,7 @@ func (r *ScorecardResult) AsString(showDetails bool, logLevel log.Level,
 		x[1] = row.Name
 		x[2] = row.Reason
 		if showDetails {
-			details, show := detailsToString(row.Details2, logLevel)
+			details, show := detailsToString(row.Details, logLevel)
 			if show {
 				x[3] = details
 			}
