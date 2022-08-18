@@ -47,7 +47,7 @@ jobs:
           # For private repositories, `publish_results` will automatically be set to `false`,
           # regardless of the value entered here.
           publish_results: ${{ matrix.publish_results }}
-          publish_base_url: "https://api-staging.securityscorecards.dev"
+          internal_publish_base_url: "https://api-staging.securityscorecards.dev"
       # Upload the results as artifacts (optional).
       - name: "Upload artifact"
         if: steps.scorecard-run.outcome == 'success'
