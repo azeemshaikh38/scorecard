@@ -17,6 +17,7 @@ package githubrepo
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -47,8 +48,11 @@ func (handler *contributorsHandler) setup() error {
 			handler.errSetup = fmt.Errorf("%w: ListContributors only supported for HEAD queries", clients.ErrUnsupportedFeature)
 			return
 		}
-		contribs, _, err := handler.ghClient.Repositories.ListContributors(
+		contribs, httpResp, err := handler.ghClient.Repositories.ListContributors(
 			handler.ctx, handler.repourl.owner, handler.repourl.repo, &github.ListContributorsOptions{})
+		if httpResp.StatusCode == http.StatusNotFound {
+			return
+		}
 		if err != nil {
 			handler.errSetup = fmt.Errorf("error during ListContributors: %w", err)
 			return

@@ -17,6 +17,7 @@ package githubrepo
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/google/go-github/v38/github"
@@ -45,9 +46,12 @@ func (handler *searchCommitsHandler) search(request clients.SearchCommitsOptions
 		return nil, fmt.Errorf("handler.buildQuery: %w", err)
 	}
 
-	resp, _, err := handler.ghClient.Search.Commits(handler.ctx,
+	resp, httpResp, err := handler.ghClient.Search.Commits(handler.ctx,
 		query,
 		&github.SearchOptions{ListOptions: github.ListOptions{PerPage: 100}})
+	if httpResp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("Search.Code: %w", err)
 	}
