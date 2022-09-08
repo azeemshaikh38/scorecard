@@ -17,6 +17,7 @@ package githubrepo
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/google/go-github/v38/github"
 
@@ -36,8 +37,11 @@ func (handler *checkrunsHandler) init(ctx context.Context, repourl *repoURL) {
 }
 
 func (handler *checkrunsHandler) listCheckRunsForRef(ref string) ([]clients.CheckRun, error) {
-	checkRuns, _, err := handler.client.Checks.ListCheckRunsForRef(
+	checkRuns, httpResp, err := handler.client.Checks.ListCheckRunsForRef(
 		handler.ctx, handler.repourl.owner, handler.repourl.repo, ref, &github.ListCheckRunsOptions{})
+	if httpResp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("ListCheckRunsForRef: %v", err))
 	}

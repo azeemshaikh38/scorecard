@@ -17,6 +17,7 @@ package githubrepo
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -48,8 +49,11 @@ func (handler *releasesHandler) setup() error {
 			handler.errSetup = fmt.Errorf("%w: ListReleases only supported for HEAD queries", clients.ErrUnsupportedFeature)
 			return
 		}
-		releases, _, err := handler.client.Repositories.ListReleases(
+		releases, httpResp, err := handler.client.Repositories.ListReleases(
 			handler.ctx, handler.repourl.owner, handler.repourl.repo, &github.ListOptions{})
+		if httpResp.StatusCode == http.StatusNotFound {
+			return
+		}
 		if err != nil {
 			handler.errSetup = sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("githubv4.Query: %v", err))
 		}

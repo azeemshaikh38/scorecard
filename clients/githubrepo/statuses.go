@@ -17,6 +17,7 @@ package githubrepo
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/google/go-github/v38/github"
 
@@ -36,8 +37,11 @@ func (handler *statusesHandler) init(ctx context.Context, repourl *repoURL) {
 }
 
 func (handler *statusesHandler) listStatuses(ref string) ([]clients.Status, error) {
-	statuses, _, err := handler.client.Repositories.ListStatuses(
+	statuses, httpResp, err := handler.client.Repositories.ListStatuses(
 		handler.ctx, handler.repourl.owner, handler.repourl.repo, ref, &github.ListOptions{})
+	if httpResp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, sce.WithMessage(sce.ErrScorecardInternal, fmt.Sprintf("ListStatuses: %v", err))
 	}

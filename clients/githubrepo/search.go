@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/google/go-github/v38/github"
@@ -48,7 +49,10 @@ func (handler *searchHandler) search(request clients.SearchRequest) (clients.Sea
 		return clients.SearchResponse{}, fmt.Errorf("handler.buildQuery: %w", err)
 	}
 
-	resp, _, err := handler.ghClient.Search.Code(handler.ctx, query, &github.SearchOptions{})
+	resp, httpResp, err := handler.ghClient.Search.Code(handler.ctx, query, &github.SearchOptions{})
+	if httpResp.StatusCode == http.StatusNotFound {
+		return clients.SearchResponse{}, nil
+	}
 	if err != nil {
 		return clients.SearchResponse{}, fmt.Errorf("Search.Code: %w", err)
 	}

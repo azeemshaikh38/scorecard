@@ -17,6 +17,7 @@ package githubrepo
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -47,8 +48,11 @@ func (handler *webhookHandler) setup() error {
 			handler.errSetup = fmt.Errorf("%w: ListWebHooks only supported for HEAD queries", clients.ErrUnsupportedFeature)
 			return
 		}
-		hooks, _, err := handler.ghClient.Repositories.ListHooks(
+		hooks, httpResp, err := handler.ghClient.Repositories.ListHooks(
 			handler.ctx, handler.repourl.owner, handler.repourl.repo, &github.ListOptions{})
+		if httpResp.StatusCode == http.StatusNotFound {
+			return
+		}
 		if err != nil {
 			handler.errSetup = fmt.Errorf("error during ListHooks: %w", err)
 			return
