@@ -26,7 +26,7 @@ require (
 	github.com/jszwec/csvutil v1.8.0
 	github.com/moby/buildkit v0.11.4
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/onsi/gomega v1.27.0
+	github.com/onsi/gomega v1.27.3
 	github.com/shurcooL/githubv4 v0.0.0-20201206200315-234843c633fa
 	github.com/shurcooL/graphql v0.0.0-20200928012149-18c5c3165e3a // indirect
 	github.com/sirupsen/logrus v1.9.0
@@ -34,9 +34,9 @@ require (
 	github.com/xeipuuv/gojsonschema v0.0.0-20180618132009-1d523034197f
 	go.opencensus.io v0.24.0
 	gocloud.dev v0.29.0
-	golang.org/x/text v0.7.0
-	golang.org/x/tools v0.6.0
-	google.golang.org/genproto v0.0.0-20230209215440-0dfe4f8abfcc
+	golang.org/x/text v0.8.0
+	golang.org/x/tools v0.7.0
+	google.golang.org/genproto v0.0.0-20230209215440-0dfe4f8abfcc // indirect
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -49,7 +49,7 @@ require (
 	github.com/gobwas/glob v0.2.3
 	github.com/google/osv-scanner v1.2.1-0.20230302232134-592acbc2539b
 	github.com/mcuadros/go-jsonschema-generator v0.0.0-20200330054847-ba7a369d4303
-	github.com/onsi/ginkgo/v2 v2.8.3
+	github.com/onsi/ginkgo/v2 v2.9.1
 	github.com/otiai10/copy v1.9.0
 	sigs.k8s.io/release-utils v0.6.0
 )
@@ -86,8 +86,8 @@ require (
 	github.com/skeema/knownhosts v1.1.0 // indirect
 	github.com/spdx/gordf v0.0.0-20221230105357-b735bd5aac89 // indirect
 	github.com/spdx/tools-golang v0.4.0 // indirect
-	golang.org/x/mod v0.8.0 // indirect
-	golang.org/x/term v0.5.0 // indirect
+	golang.org/x/mod v0.9.0 // indirect
+	golang.org/x/term v0.6.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/vuln v0.0.0-20230118164824-4ec8867cc0e6 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -126,7 +126,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.3 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-github/v45 v45.2.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
@@ -157,10 +157,10 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2
-	golang.org/x/net v0.7.0 // indirect
+	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/oauth2 v0.5.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/api v0.110.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
