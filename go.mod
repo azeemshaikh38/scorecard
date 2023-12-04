@@ -50,7 +50,7 @@ require (
 	github.com/google/osv-scanner v1.3.2
 	github.com/mcuadros/go-jsonschema-generator v0.0.0-20200330054847-ba7a369d4303
 	github.com/onsi/ginkgo/v2 v2.9.4
-	github.com/otiai10/copy v1.11.0
+	github.com/otiai10/copy v1.14.0
 	sigs.k8s.io/release-utils v0.6.0
 )
 
@@ -172,7 +172,7 @@ require (
 	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
-	golang.org/x/sync v0.2.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/api v0.118.0 // indirect
