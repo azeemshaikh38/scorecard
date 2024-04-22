@@ -36,7 +36,7 @@ jobs:
       docs_only: ${{ steps.docs_only_check.outputs.docs_only }}
     steps:
     - name: Check out code
-      uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab #v3.5.2
+      uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f #v4.1.3
       with:
         fetch-depth: 2
     - id: files
@@ -86,7 +86,7 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v2.3.4
+       uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
@@ -134,7 +134,7 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v2.3.4
+       uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
@@ -182,7 +182,7 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v2.3.4
+       uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
@@ -230,7 +230,7 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v2.3.4
+       uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
@@ -278,7 +278,7 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v2.3.4
+       uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
@@ -326,7 +326,7 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v2.3.4
+       uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
@@ -374,7 +374,7 @@ jobs:
          restore-keys: |
            ${{ runner.os }}-go-
      - name: Clone the code
-       uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v2.3.4
+       uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v2.3.4
        with:
           fetch-depth: 0
      - name: Setup Go
