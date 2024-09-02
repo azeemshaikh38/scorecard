@@ -41,7 +41,7 @@ jobs:
         fetch-depth: 2
     - id: files
       name: Get changed files
-      uses: tj-actions/changed-files@b2d17f51244a144849c6b37a3a6791b98a51d86f #v35.9.2
+      uses: tj-actions/changed-files@e9772d140489982e0e3704fea5ee93d536f1e275 #v45.0.1
       with:
         files_ignore: '**.md'
     - id: docs_only_check
