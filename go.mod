@@ -1,6 +1,6 @@
 module github.com/ossf/scorecard/v4
 
-go 1.19
+go 1.21
 
 require (
 	github.com/rhysd/actionlint v1.6.15
@@ -18,7 +18,7 @@ require (
 	github.com/go-git/go-git/v5 v5.6.1
 	github.com/go-logr/logr v1.2.4
 	github.com/golang/mock v1.6.0
-	github.com/google/go-cmp v0.5.9
+	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.15.1
 	github.com/google/go-github/v38 v38.1.0
 	github.com/grafeas/kritis v0.2.3-0.20210120183821-faeba81c520c
