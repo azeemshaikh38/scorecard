@@ -1,6 +1,6 @@
 module github.com/ossf/scorecard/tools
 
-go 1.19
+go 1.23
 
 require (
 	github.com/golang/mock v1.6.0
@@ -10,7 +10,7 @@ require (
 	github.com/goreleaser/goreleaser v1.18.2
 	github.com/naveensrinivasan/stunning-tribble v0.4.2
 	github.com/onsi/ginkgo/v2 v2.9.4
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
@@ -181,7 +181,7 @@ require (
 	github.com/golangci/misspell v0.4.0 // indirect
 	github.com/golangci/revgrep v0.0.0-20220804021717-745bb2f7c2e6 // indirect
 	github.com/golangci/unconvert v0.0.0-20180507085042-28b1c447d1f4 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-containerregistry v0.14.0 // indirect
 	github.com/google/go-github/v50 v50.1.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
