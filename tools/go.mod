@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.52.2
-	github.com/google/addlicense v1.1.1
+	github.com/google/addlicense v1.2.0
 	github.com/google/ko v0.13.0
 	github.com/goreleaser/goreleaser v1.18.2
 	github.com/naveensrinivasan/stunning-tribble v0.4.2
